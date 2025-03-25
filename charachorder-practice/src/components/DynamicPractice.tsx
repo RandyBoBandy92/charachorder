@@ -287,31 +287,17 @@ export const DynamicPractice = () => {
         if (reviewLetter) {
           nextChar = reviewLetter.char;
         } else {
-          // If no review letters, move to next in sequence
-          const currentIndex = newActive.findIndex(
-            (l) => l.char === prevState.currentChar
-          );
-          // Find the next letter in sequence, prioritizing non-new letters
-          let nextIndex = (currentIndex + 1) % newActive.length;
-          let attempts = 0;
-          // Try to find a non-new letter first
-          while (attempts < newActive.length) {
-            if (!newActive[nextIndex].isNew) {
-              break;
-            }
-            nextIndex = (nextIndex + 1) % newActive.length;
-            attempts++;
-          }
-          // If we've gone through all letters and they're all new,
-          // or if we're back at the start, just use the next index
-          nextChar = newActive[nextIndex].char;
-
-          // Every third character, check if we should practice a new letter
-          if (prevState.sessionAttempts % 3 === 0) {
-            const newLetter = newActive.find((l) => l.isNew);
-            if (newLetter) {
-              nextChar = newLetter.char;
-            }
+          // Then look for new letters
+          const newLetter = newActive.find((l) => l.isNew);
+          if (newLetter) {
+            nextChar = newLetter.char;
+          } else {
+            // If no review or new letters, move to next in sequence
+            const currentIndex = newActive.findIndex(
+              (l) => l.char === prevState.currentChar
+            );
+            const nextIndex = (currentIndex + 1) % newActive.length;
+            nextChar = newActive[nextIndex].char;
           }
         }
 
