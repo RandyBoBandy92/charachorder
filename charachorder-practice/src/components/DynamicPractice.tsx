@@ -59,6 +59,7 @@ interface PracticeState {
   sessionAttempts: number;
   sessionCorrect: number;
   streakProgress: number;
+  lastLetterAddedAttempt: number; // Track when we last added a letter
 }
 
 const STORAGE_KEY = "charachorder_dynamic_practice";
@@ -66,6 +67,7 @@ const INITIAL_LETTER_COUNT = 5;
 const ATTEMPTS_WINDOW_SIZE = 20;
 const NEW_LETTER_ATTEMPTS_NEEDED = 5;
 const REVIEW_LETTER_ATTEMPTS_NEEDED = 5;
+const MIN_ATTEMPTS_BEFORE_ADDING_LETTERS = 15; // Minimum attempts before adding more letters
 
 const createInitialState = (): PracticeState => {
   const initialActive = ALL_LETTERS.slice(0, INITIAL_LETTER_COUNT).map(
@@ -84,6 +86,7 @@ const createInitialState = (): PracticeState => {
     sessionAttempts: 0,
     sessionCorrect: 0,
     streakProgress: 0,
+    lastLetterAddedAttempt: 0,
   };
 };
 
@@ -166,6 +169,14 @@ export const DynamicPractice = () => {
       // Check progression more frequently - every 10 attempts
       if (state.sessionAttempts % 10 !== 0) return null;
 
+      // Check if we've had enough attempts since last adding letters
+      if (
+        state.sessionAttempts - state.lastLetterAddedAttempt <
+        MIN_ATTEMPTS_BEFORE_ADDING_LETTERS
+      ) {
+        return null;
+      }
+
       // Calculate overall accuracy for active letters
       const overallAccuracy = state.sessionCorrect / state.sessionAttempts;
 
@@ -183,7 +194,7 @@ export const DynamicPractice = () => {
       if (recentMistakes <= 2) return 1; // Good performance: add 1 letter
       return 0; // Need more practice
     },
-    [state.sessionAttempts, state.sessionCorrect]
+    [state.sessionAttempts, state.sessionCorrect, state.lastLetterAddedAttempt]
   );
 
   const handleKeyPress = useCallback(
@@ -312,6 +323,7 @@ export const DynamicPractice = () => {
         const lettersToAdd = checkProgression(randomizedActive);
         let newActive = isStreakComplete ? randomizedActive : updatedActive;
         let newNext = prevState.nextLettersToAdd;
+        let newLastLetterAddedAttempt = prevState.lastLetterAddedAttempt;
 
         if (lettersToAdd && prevState.nextLettersToAdd.length > 0) {
           const newLetters = prevState.nextLettersToAdd
@@ -330,6 +342,7 @@ export const DynamicPractice = () => {
             }));
           newActive = [...newActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
+          newLastLetterAddedAttempt = prevState.sessionAttempts;
         }
 
         // Find next character to practice
@@ -377,6 +390,7 @@ export const DynamicPractice = () => {
           sessionAttempts: prevState.sessionAttempts + 1,
           sessionCorrect: prevState.sessionCorrect + 1,
           streakProgress: streakProgress,
+          lastLetterAddedAttempt: newLastLetterAddedAttempt,
         };
       });
     },
