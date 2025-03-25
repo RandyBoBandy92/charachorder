@@ -69,13 +69,15 @@ jobs:
           pwd
           echo "Contents of current directory:"
           ls -la
-          echo "Contents of dist directory:"
-          ls -la dist || echo "dist directory not found"
+          echo "Contents of parent directory:"
+          ls -la ..
+          echo "Full directory tree:"
+          find . -type d | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ${{ github.workspace }}/charachorder-practice/dist
 
   deploy:
     environment:
