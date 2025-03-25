@@ -46,6 +46,7 @@ export interface LetterProgress {
   status: LetterStatus;
   successfulAttemptsNeeded: number;
   successfulAttemptsCount: number;
+  visitedInCurrentStreak: boolean;
 }
 
 interface PracticeState {
@@ -57,6 +58,7 @@ interface PracticeState {
   isCorrect: boolean | null;
   sessionAttempts: number;
   sessionCorrect: number;
+  streakProgress: number;
 }
 
 const STORAGE_KEY = "charachorder_dynamic_practice";
@@ -81,6 +83,7 @@ const createInitialState = (): PracticeState => {
     isCorrect: null,
     sessionAttempts: 0,
     sessionCorrect: 0,
+    streakProgress: 0,
   };
 };
 
@@ -96,7 +99,18 @@ const createLetterProgress = (
   status: "new",
   successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
   successfulAttemptsCount: 0,
+  visitedInCurrentStreak: false,
 });
+
+// Fisher-Yates shuffle algorithm for randomizing array order
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
 
 export const DynamicPractice = () => {
   const [state, setState] = useState<PracticeState>(() => {
@@ -109,20 +123,24 @@ export const DynamicPractice = () => {
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
         })
       );
       parsedState.masteredLetters = parsedState.masteredLetters.map(
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
         })
       );
       parsedState.nextLettersToAdd = parsedState.nextLettersToAdd.map(
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
         })
       );
+      parsedState.streakProgress = parsedState.streakProgress || 0;
       return parsedState;
     }
     return createInitialState();
@@ -214,6 +232,11 @@ export const DynamicPractice = () => {
               newAttemptsNeeded = 0;
             }
 
+            // Mark letter as visited if the input was correct
+            const newVisitedInCurrentStreak = isCorrect
+              ? true
+              : letter.visitedInCurrentStreak;
+
             return {
               ...letter,
               attempts: letter.attempts + 1,
@@ -224,6 +247,7 @@ export const DynamicPractice = () => {
               status: newStatus,
               successfulAttemptsNeeded: newAttemptsNeeded,
               successfulAttemptsCount: newSuccessfulAttemptsCount,
+              visitedInCurrentStreak: newVisitedInCurrentStreak,
             };
           }
           return letter;
@@ -245,6 +269,25 @@ export const DynamicPractice = () => {
           (l) => l.char === prevState.currentChar
         );
 
+        // Update streak progress by counting the visited letters
+        let streakProgress = updatedActive.filter(
+          (l) => l.visitedInCurrentStreak
+        ).length;
+
+        // Check if we've completed a full streak through all active letters
+        const isStreakComplete = streakProgress === updatedActive.length;
+
+        // Reset streak and randomize order if streak is complete
+        let randomizedActive = updatedActive;
+        if (isStreakComplete) {
+          // Shuffle the array using Fisher-Yates algorithm
+          randomizedActive = shuffleArray(updatedActive).map((letter) => ({
+            ...letter,
+            visitedInCurrentStreak: false, // Reset visited status for the new streak
+          }));
+          streakProgress = 0; // Reset streak progress
+        }
+
         // If the letter is still in new or review mode and needs more successful attempts,
         // stay on it
         if (
@@ -256,17 +299,18 @@ export const DynamicPractice = () => {
         ) {
           return {
             ...prevState,
-            activeLetters: updatedActive,
+            activeLetters: isStreakComplete ? randomizedActive : updatedActive,
             lastKeyPressed: pressedKey,
             isCorrect,
             sessionAttempts: prevState.sessionAttempts + 1,
             sessionCorrect: prevState.sessionCorrect + 1,
+            streakProgress: streakProgress,
           };
         }
 
         // Check if we should add new letters
-        const lettersToAdd = checkProgression(updatedActive);
-        let newActive = updatedActive;
+        const lettersToAdd = checkProgression(randomizedActive);
+        let newActive = isStreakComplete ? randomizedActive : updatedActive;
         let newNext = prevState.nextLettersToAdd;
 
         if (lettersToAdd && prevState.nextLettersToAdd.length > 0) {
@@ -282,29 +326,44 @@ export const DynamicPractice = () => {
               status: "new" as LetterStatus,
               successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
               successfulAttemptsCount: 0,
+              visitedInCurrentStreak: false,
             }));
-          newActive = [...updatedActive, ...newLetters];
+          newActive = [...newActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
         }
 
         // Find next character to practice
         let nextChar;
+
         // First, look for any letters that need review
-        const reviewLetter = newActive.find((l) => l.status === "review");
+        const reviewLetter = newActive.find(
+          (l) => l.status === "review" && !l.visitedInCurrentStreak
+        );
         if (reviewLetter) {
           nextChar = reviewLetter.char;
         } else {
           // Then look for new letters
-          const newLetter = newActive.find((l) => l.status === "new");
+          const newLetter = newActive.find(
+            (l) => l.status === "new" && !l.visitedInCurrentStreak
+          );
           if (newLetter) {
             nextChar = newLetter.char;
           } else {
-            // If no review or new letters, move to next in sequence
-            const currentIndex = newActive.findIndex(
-              (l) => l.char === prevState.currentChar
+            // Then look for any unvisited normal letters
+            const unvisitedLetter = newActive.find(
+              (l) => !l.visitedInCurrentStreak
             );
-            const nextIndex = (currentIndex + 1) % newActive.length;
-            nextChar = newActive[nextIndex].char;
+            if (unvisitedLetter) {
+              nextChar = unvisitedLetter.char;
+            } else {
+              // If all letters have been visited (shouldn't happen due to reset above)
+              // just move to the next letter in sequence
+              const currentIndex = newActive.findIndex(
+                (l) => l.char === prevState.currentChar
+              );
+              const nextIndex = (currentIndex + 1) % newActive.length;
+              nextChar = newActive[nextIndex].char;
+            }
           }
         }
 
@@ -317,6 +376,7 @@ export const DynamicPractice = () => {
           isCorrect,
           sessionAttempts: prevState.sessionAttempts + 1,
           sessionCorrect: prevState.sessionCorrect + 1,
+          streakProgress: streakProgress,
         };
       });
     },
@@ -346,6 +406,9 @@ export const DynamicPractice = () => {
     <div className="dynamic-practice">
       <div className="progress-indicator">
         Active Letters: {state.activeLetters.length} / {ALL_LETTERS.length}
+        <div className="streak-info">
+          Streak: {state.streakProgress} / {state.activeLetters.length}
+        </div>
       </div>
       <div
         className={`character-display ${
