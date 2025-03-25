@@ -508,6 +508,47 @@ export const DynamicPractice = () => {
     }
   }, []);
 
+  const handleUnlockAll = useCallback(() => {
+    if (
+      window.confirm(
+        "Are you sure you want to unlock all letters? This cannot be undone."
+      )
+    ) {
+      setState((prevState) => {
+        // Move all letters from nextLettersToAdd to activeLetters
+        const allLettersActive = [
+          ...prevState.activeLetters,
+          ...prevState.nextLettersToAdd.map((letter) => ({
+            ...letter,
+            accuracy: 1,
+            attempts: 0,
+            lastAttempts: [],
+            mastered: false,
+            dateIntroduced: new Date(),
+            status: "new" as LetterStatus,
+            successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
+            successfulAttemptsCount: 0,
+            visitedInCurrentStreak: false,
+            familiarityScore: 0,
+            lastPracticed: new Date(),
+            selectionWeight: calculateSelectionWeight(letter),
+            errorPatterns: {
+              consecutiveErrors: 0,
+              confusedWith: {},
+            },
+          })),
+        ];
+
+        return {
+          ...prevState,
+          activeLetters: allLettersActive,
+          nextLettersToAdd: [],
+          sessionQueue: createPracticeSession(allLettersActive),
+        };
+      });
+    }
+  }, []);
+
   const checkProgression = useCallback(
     (letterProgress: LetterProgress[]) => {
       // Check progression more frequently - every 10 attempts
@@ -818,6 +859,9 @@ export const DynamicPractice = () => {
           <div className="reset-section">
             <button className="reset-button" onClick={handleReset}>
               Reset Progress
+            </button>
+            <button className="unlock-button" onClick={handleUnlockAll}>
+              Unlock All
             </button>
           </div>
         </div>

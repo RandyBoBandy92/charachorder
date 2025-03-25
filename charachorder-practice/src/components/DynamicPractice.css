@@ -222,6 +222,9 @@
   width: 100%;
   text-align: center;
   border: 2px solid #4a5568;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
 }
 
 .reset-button {
@@ -234,6 +237,7 @@
   font-size: 1rem;
   font-weight: 600;
   transition: all 0.2s ease;
+  min-width: 140px;
 }
 
 .reset-button:hover {
@@ -242,6 +246,28 @@
 }
 
 .reset-button:active {
+  transform: translateY(1px);
+}
+
+.unlock-button {
+  padding: 12px 24px;
+  background-color: transparent;
+  color: white;
+  border: 2px solid #4299e1;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.unlock-button:hover {
+  background-color: #4299e1;
+  transform: translateY(-1px);
+}
+
+.unlock-button:active {
   transform: translateY(1px);
 }
 
