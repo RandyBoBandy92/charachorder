@@ -32,6 +32,9 @@ const ALL_LETTERS = [
   { char: "Q", frequency: 0.1962 },
 ];
 
+// Status types for tracking letter progress
+export type LetterStatus = "new" | "review" | "normal";
+
 export interface LetterProgress {
   char: string;
   frequency: number;
@@ -40,10 +43,9 @@ export interface LetterProgress {
   lastAttempts: boolean[];
   mastered: boolean;
   dateIntroduced: Date;
-  isNew: boolean;
-  successfulNewAttempts: number;
-  needsReview: boolean;
-  reviewAttempts: number;
+  status: LetterStatus;
+  successfulAttemptsNeeded: number;
+  successfulAttemptsCount: number;
 }
 
 interface PracticeState {
@@ -57,9 +59,29 @@ interface PracticeState {
   sessionCorrect: number;
 }
 
+// Legacy data structure for migration from older saved state
+interface LegacyLetterProgress {
+  char: string;
+  frequency: number;
+  accuracy: number;
+  attempts: number;
+  lastAttempts: boolean[];
+  mastered: boolean;
+  dateIntroduced: string; // Will be converted to Date
+  isNew?: boolean;
+  successfulNewAttempts?: number;
+  needsReview?: boolean;
+  reviewAttempts?: number;
+  status?: string;
+  successfulAttemptsNeeded?: number;
+  successfulAttemptsCount?: number;
+}
+
 const STORAGE_KEY = "charachorder_dynamic_practice";
 const INITIAL_LETTER_COUNT = 5;
 const ATTEMPTS_WINDOW_SIZE = 20;
+const NEW_LETTER_ATTEMPTS_NEEDED = 5;
+const REVIEW_LETTER_ATTEMPTS_NEEDED = 5;
 
 const createInitialState = (): PracticeState => {
   const initialActive = ALL_LETTERS.slice(0, INITIAL_LETTER_COUNT).map(
@@ -89,10 +111,9 @@ const createLetterProgress = (
   lastAttempts: [],
   mastered: false,
   dateIntroduced: new Date(),
-  isNew: true,
-  successfulNewAttempts: 0,
-  needsReview: false,
-  reviewAttempts: 0,
+  status: "new",
+  successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
+  successfulAttemptsCount: 0,
 });
 
 export const DynamicPractice = () => {
@@ -103,21 +124,52 @@ export const DynamicPractice = () => {
       const parsedState = JSON.parse(savedState);
       // Convert stored date strings back to Date objects
       parsedState.activeLetters = parsedState.activeLetters.map(
-        (letter: LetterProgress) => ({
+        (letter: LegacyLetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          // Handle migration from old data structure
+          status:
+            (letter.status as LetterStatus) ||
+            (letter.isNew
+              ? ("new" as LetterStatus)
+              : letter.needsReview
+              ? ("review" as LetterStatus)
+              : ("normal" as LetterStatus)),
+          successfulAttemptsNeeded:
+            letter.successfulAttemptsNeeded ||
+            (letter.isNew
+              ? NEW_LETTER_ATTEMPTS_NEEDED
+              : letter.needsReview
+              ? REVIEW_LETTER_ATTEMPTS_NEEDED
+              : 0),
+          successfulAttemptsCount:
+            letter.successfulAttemptsCount ||
+            (letter.isNew
+              ? letter.successfulNewAttempts || 0
+              : letter.needsReview
+              ? letter.reviewAttempts || 0
+              : 0),
         })
       );
       parsedState.masteredLetters = parsedState.masteredLetters.map(
-        (letter: LetterProgress) => ({
+        (letter: LegacyLetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          // Handle migration from old data structure
+          status: (letter.status as LetterStatus) || ("normal" as LetterStatus),
+          successfulAttemptsNeeded: letter.successfulAttemptsNeeded || 0,
+          successfulAttemptsCount: letter.successfulAttemptsCount || 0,
         })
       );
       parsedState.nextLettersToAdd = parsedState.nextLettersToAdd.map(
-        (letter: LetterProgress) => ({
+        (letter: LegacyLetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          // Handle migration from old data structure
+          status: (letter.status as LetterStatus) || ("new" as LetterStatus),
+          successfulAttemptsNeeded:
+            letter.successfulAttemptsNeeded || NEW_LETTER_ATTEMPTS_NEEDED,
+          successfulAttemptsCount: letter.successfulAttemptsCount || 0,
         })
       );
       return parsedState;
@@ -178,11 +230,11 @@ export const DynamicPractice = () => {
             const newAttempts = [...letter.lastAttempts, isCorrect].slice(
               -ATTEMPTS_WINDOW_SIZE
             );
-            const isNewLetter = letter.isNew;
-            const newSuccessfulAttempts =
-              isNewLetter && isCorrect
-                ? letter.successfulNewAttempts + 1
-                : letter.successfulNewAttempts;
+
+            // Update successful attempts count if correct
+            let newSuccessfulAttemptsCount = isCorrect
+              ? letter.successfulAttemptsCount + 1
+              : 0;
 
             // Check if letter needs review (3 or more mistakes in last 5 attempts)
             const recentAttempts = newAttempts.slice(-5);
@@ -191,13 +243,25 @@ export const DynamicPractice = () => {
             ).length;
             const needsReview = recentMistakes >= 3;
 
-            // Update review attempts if in review mode
-            const reviewAttempts =
-              letter.needsReview && isCorrect
-                ? letter.reviewAttempts + 1
-                : needsReview
-                ? 0
-                : letter.reviewAttempts;
+            // Determine the letter's status
+            let newStatus: LetterStatus = letter.status;
+            let newAttemptsNeeded = letter.successfulAttemptsNeeded;
+
+            // If the letter needs review, reset the count and set to review mode
+            if (needsReview && letter.status !== "review") {
+              newStatus = "review";
+              newAttemptsNeeded = REVIEW_LETTER_ATTEMPTS_NEEDED;
+              newSuccessfulAttemptsCount = 0;
+            }
+
+            // If we've completed the required attempts, move to normal mode
+            if (
+              newSuccessfulAttemptsCount >= newAttemptsNeeded &&
+              (letter.status === "new" || letter.status === "review")
+            ) {
+              newStatus = "normal";
+              newAttemptsNeeded = 0;
+            }
 
             return {
               ...letter,
@@ -206,11 +270,9 @@ export const DynamicPractice = () => {
               accuracy:
                 (letter.accuracy * letter.attempts + (isCorrect ? 1 : 0)) /
                 (letter.attempts + 1),
-              successfulNewAttempts: newSuccessfulAttempts,
-              isNew: isNewLetter && newSuccessfulAttempts < 5,
-              needsReview:
-                needsReview || (letter.needsReview && reviewAttempts < 5),
-              reviewAttempts: reviewAttempts,
+              status: newStatus,
+              successfulAttemptsNeeded: newAttemptsNeeded,
+              successfulAttemptsCount: newSuccessfulAttemptsCount,
             };
           }
           return letter;
@@ -232,20 +294,15 @@ export const DynamicPractice = () => {
           (l) => l.char === prevState.currentChar
         );
 
-        // If it's a new letter and we haven't hit 5 successful attempts, stay on it
-        if (currentLetter?.isNew && currentLetter.successfulNewAttempts < 5) {
-          return {
-            ...prevState,
-            activeLetters: updatedActive,
-            lastKeyPressed: pressedKey,
-            isCorrect,
-            sessionAttempts: prevState.sessionAttempts + 1,
-            sessionCorrect: prevState.sessionCorrect + 1,
-          };
-        }
-
-        // If letter needs review and hasn't completed 5 successful review attempts, stay on it
-        if (currentLetter?.needsReview && currentLetter.reviewAttempts < 5) {
+        // If the letter is still in new or review mode and needs more successful attempts,
+        // stay on it
+        if (
+          currentLetter &&
+          (currentLetter.status === "new" ||
+            currentLetter.status === "review") &&
+          currentLetter.successfulAttemptsCount <
+            currentLetter.successfulAttemptsNeeded
+        ) {
           return {
             ...prevState,
             activeLetters: updatedActive,
@@ -268,13 +325,12 @@ export const DynamicPractice = () => {
               ...letter,
               accuracy: 1,
               attempts: 0,
-              lastAttempts: [],
+              lastAttempts: [] as boolean[],
               mastered: false,
               dateIntroduced: new Date(),
-              isNew: true,
-              successfulNewAttempts: 0,
-              needsReview: false,
-              reviewAttempts: 0,
+              status: "new" as LetterStatus,
+              successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
+              successfulAttemptsCount: 0,
             }));
           newActive = [...updatedActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
@@ -283,12 +339,12 @@ export const DynamicPractice = () => {
         // Find next character to practice
         let nextChar;
         // First, look for any letters that need review
-        const reviewLetter = newActive.find((l) => l.needsReview);
+        const reviewLetter = newActive.find((l) => l.status === "review");
         if (reviewLetter) {
           nextChar = reviewLetter.char;
         } else {
           // Then look for new letters
-          const newLetter = newActive.find((l) => l.isNew);
+          const newLetter = newActive.find((l) => l.status === "new");
           if (newLetter) {
             nextChar = newLetter.char;
           } else {
@@ -323,6 +379,18 @@ export const DynamicPractice = () => {
     };
   }, [handleKeyPress]);
 
+  // Helper function to determine the status label text
+  const getProgressText = (letter: LetterProgress) => {
+    if (letter.status === "new") return "New Letter";
+    if (letter.status === "review") return "Review Letter";
+    return "";
+  };
+
+  // Get the current letter details
+  const currentLetter = state.activeLetters.find(
+    (l) => l.char === state.currentChar
+  );
+
   return (
     <div className="dynamic-practice">
       <div className="progress-indicator">
@@ -334,34 +402,31 @@ export const DynamicPractice = () => {
         }`}
       >
         {state.currentChar}
-        {state.activeLetters.find((l) => l.char === state.currentChar)
-          ?.isNew && (
-          <div className="new-letter-progress">
-            <div className="progress-text">
-              New Letter:{" "}
-              {
-                state.activeLetters.find((l) => l.char === state.currentChar)
-                  ?.successfulNewAttempts
-              }{" "}
-              / 5
+        {currentLetter &&
+          (currentLetter.status === "new" ||
+            currentLetter.status === "review") && (
+            <div className={`letter-progress ${currentLetter.status}`}>
+              <div className="progress-text">
+                {getProgressText(currentLetter)}:{" "}
+                {currentLetter.successfulAttemptsCount} /{" "}
+                {currentLetter.successfulAttemptsNeeded}
+              </div>
+              <div className="progress-dots">
+                {[...Array(currentLetter.successfulAttemptsNeeded)].map(
+                  (_, i) => (
+                    <span
+                      key={i}
+                      className={`progress-dot ${
+                        i < currentLetter.successfulAttemptsCount
+                          ? "completed"
+                          : ""
+                      }`}
+                    />
+                  )
+                )}
+              </div>
             </div>
-            <div className="progress-dots">
-              {[...Array(5)].map((_, i) => (
-                <span
-                  key={i}
-                  className={`progress-dot ${
-                    i <
-                    (state.activeLetters.find(
-                      (l) => l.char === state.currentChar
-                    )?.successfulNewAttempts || 0)
-                      ? "completed"
-                      : ""
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          )}
       </div>
       <div className="last-key-display">
         Last Key:{" "}
@@ -383,14 +448,20 @@ export const DynamicPractice = () => {
             key={letter.char}
             className={`letter-indicator ${
               letter.char === state.currentChar ? "current" : ""
-            } ${letter.isNew ? "new" : ""}`}
+            } ${letter.status}`}
             title={`Accuracy: ${Math.round(letter.accuracy * 100)}%${
-              letter.isNew ? ` | New: ${letter.successfulNewAttempts}/5` : ""
+              letter.status !== "normal"
+                ? ` | ${getProgressText(letter)}: ${
+                    letter.successfulAttemptsCount
+                  }/${letter.successfulAttemptsNeeded}`
+                : ""
             }`}
           >
             {letter.char}
-            {letter.isNew && (
-              <span className="new-badge">{letter.successfulNewAttempts}</span>
+            {(letter.status === "new" || letter.status === "review") && (
+              <span className={`status-badge ${letter.status}`}>
+                {letter.successfulAttemptsCount}
+              </span>
             )}
           </span>
         ))}

@@ -27,6 +27,7 @@
   height: 200px;
   width: 200px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background-color: white;
@@ -34,6 +35,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   margin-bottom: 2rem;
   transition: all 0.2s ease;
+  position: relative;
 }
 
 .character-display.incorrect {
@@ -89,6 +91,7 @@
   color: #4a5568;
   transition: all 0.2s ease;
   cursor: help;
+  position: relative;
 }
 
 .letter-indicator.current {
@@ -97,17 +100,22 @@
   transform: scale(1.1);
 }
 
-.letter-indicator.needs-review {
-  background-color: #fff5f5;
-  border: 2px solid #f56565;
-  position: relative;
+/* Unified styles for letter types */
+.letter-indicator.new {
+  background-color: #ebf4ff;
+  border: 2px solid #4299e1;
 }
 
-.review-badge {
+.letter-indicator.review {
+  background-color: #fff5f5;
+  border: 2px solid #f56565;
+}
+
+/* Unified badge styling */
+.status-badge {
   position: absolute;
   top: -8px;
   right: -8px;
-  background-color: #f56565;
   color: white;
   border-radius: 50%;
   width: 20px;
@@ -117,6 +125,14 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
+}
+
+.status-badge.new {
+  background-color: #4299e1;
+}
+
+.status-badge.review {
+  background-color: #f56565;
 }
 
 .next-letters {
@@ -188,16 +204,30 @@
   transform: translateY(1px);
 }
 
-.new-letter-progress {
-  margin-top: 1rem;
+/* Unified progress indicator for both new and review letters */
+.letter-progress {
+  margin-top: 0.5rem;
   text-align: center;
-  font-size: 1rem;
-  color: #4a5568;
+  font-size: 0.9rem;
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.letter-progress.new {
+  background-color: rgba(66, 153, 225, 0.1);
+  border: 1px solid rgba(66, 153, 225, 0.3);
+}
+
+.letter-progress.review {
+  background-color: rgba(245, 101, 101, 0.1);
+  border: 1px solid rgba(245, 101, 101, 0.3);
 }
 
 .progress-text {
   margin-bottom: 0.5rem;
   font-weight: 600;
+  font-size: 0.9rem;
   color: #2d3748;
 }
 
@@ -220,26 +250,4 @@
 .progress-dot.completed {
   background-color: #48bb78;
   border-color: #38a169;
-}
-
-.letter-indicator.new {
-  background-color: #ebf4ff;
-  border: 2px solid #4299e1;
-  position: relative;
-}
-
-.new-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background-color: #4299e1;
-  color: white;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  font-size: 0.8rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
 }
