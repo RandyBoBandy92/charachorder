@@ -59,24 +59,6 @@ interface PracticeState {
   sessionCorrect: number;
 }
 
-// Legacy data structure for migration from older saved state
-interface LegacyLetterProgress {
-  char: string;
-  frequency: number;
-  accuracy: number;
-  attempts: number;
-  lastAttempts: boolean[];
-  mastered: boolean;
-  dateIntroduced: string; // Will be converted to Date
-  isNew?: boolean;
-  successfulNewAttempts?: number;
-  needsReview?: boolean;
-  reviewAttempts?: number;
-  status?: string;
-  successfulAttemptsNeeded?: number;
-  successfulAttemptsCount?: number;
-}
-
 const STORAGE_KEY = "charachorder_dynamic_practice";
 const INITIAL_LETTER_COUNT = 5;
 const ATTEMPTS_WINDOW_SIZE = 20;
@@ -124,52 +106,21 @@ export const DynamicPractice = () => {
       const parsedState = JSON.parse(savedState);
       // Convert stored date strings back to Date objects
       parsedState.activeLetters = parsedState.activeLetters.map(
-        (letter: LegacyLetterProgress) => ({
+        (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
-          // Handle migration from old data structure
-          status:
-            (letter.status as LetterStatus) ||
-            (letter.isNew
-              ? ("new" as LetterStatus)
-              : letter.needsReview
-              ? ("review" as LetterStatus)
-              : ("normal" as LetterStatus)),
-          successfulAttemptsNeeded:
-            letter.successfulAttemptsNeeded ||
-            (letter.isNew
-              ? NEW_LETTER_ATTEMPTS_NEEDED
-              : letter.needsReview
-              ? REVIEW_LETTER_ATTEMPTS_NEEDED
-              : 0),
-          successfulAttemptsCount:
-            letter.successfulAttemptsCount ||
-            (letter.isNew
-              ? letter.successfulNewAttempts || 0
-              : letter.needsReview
-              ? letter.reviewAttempts || 0
-              : 0),
         })
       );
       parsedState.masteredLetters = parsedState.masteredLetters.map(
-        (letter: LegacyLetterProgress) => ({
+        (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
-          // Handle migration from old data structure
-          status: (letter.status as LetterStatus) || ("normal" as LetterStatus),
-          successfulAttemptsNeeded: letter.successfulAttemptsNeeded || 0,
-          successfulAttemptsCount: letter.successfulAttemptsCount || 0,
         })
       );
       parsedState.nextLettersToAdd = parsedState.nextLettersToAdd.map(
-        (letter: LegacyLetterProgress) => ({
+        (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
-          // Handle migration from old data structure
-          status: (letter.status as LetterStatus) || ("new" as LetterStatus),
-          successfulAttemptsNeeded:
-            letter.successfulAttemptsNeeded || NEW_LETTER_ATTEMPTS_NEEDED,
-          successfulAttemptsCount: letter.successfulAttemptsCount || 0,
         })
       );
       return parsedState;
