@@ -47,6 +47,15 @@ export interface LetterProgress {
   successfulAttemptsNeeded: number;
   successfulAttemptsCount: number;
   visitedInCurrentStreak: boolean;
+
+  // New properties for enhanced selection algorithm
+  familiarityScore: number;
+  lastPracticed: Date;
+  selectionWeight: number;
+  errorPatterns: {
+    consecutiveErrors: number;
+    confusedWith: { [char: string]: number };
+  };
 }
 
 interface PracticeState {
@@ -60,6 +69,7 @@ interface PracticeState {
   sessionCorrect: number;
   streakProgress: number;
   lastLetterAddedAttempt: number; // Track when we last added a letter
+  sessionQueue: string[]; // Queue of characters to practice in current session
 }
 
 const STORAGE_KEY = "charachorder_dynamic_practice";
@@ -68,6 +78,31 @@ const ATTEMPTS_WINDOW_SIZE = 20;
 const NEW_LETTER_ATTEMPTS_NEEDED = 5;
 const REVIEW_LETTER_ATTEMPTS_NEEDED = 5;
 const MIN_ATTEMPTS_BEFORE_ADDING_LETTERS = 15; // Minimum attempts before adding more letters
+
+// Helper function to calculate days between two dates
+const daysBetween = (date1: Date, date2: Date): number => {
+  const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
+  const diffDays = Math.round(
+    Math.abs((date1.getTime() - date2.getTime()) / oneDay)
+  );
+  return diffDays;
+};
+
+// Calculate selection weight for a letter
+const calculateSelectionWeight = (letter: LetterProgress): number => {
+  // Base weight from letter frequency in language
+  let weight = letter.frequency / 10;
+
+  // Adjust for accuracy (lower accuracy = higher weight)
+  weight *= 2 - letter.accuracy;
+
+  // Boost new letters
+  if (letter.attempts < 10) {
+    weight *= 2;
+  }
+
+  return weight;
+};
 
 const createInitialState = (): PracticeState => {
   const initialActive = ALL_LETTERS.slice(0, INITIAL_LETTER_COUNT).map(
@@ -87,6 +122,7 @@ const createInitialState = (): PracticeState => {
     sessionCorrect: 0,
     streakProgress: 0,
     lastLetterAddedAttempt: 0,
+    sessionQueue: [],
   };
 };
 
@@ -103,16 +139,235 @@ const createLetterProgress = (
   successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
   successfulAttemptsCount: 0,
   visitedInCurrentStreak: false,
+  // New properties
+  familiarityScore: 0,
+  lastPracticed: new Date(),
+  selectionWeight: (letter.frequency / 10) * 2, // Initial weight based on frequency with new letter boost
+  errorPatterns: {
+    consecutiveErrors: 0,
+    confusedWith: {},
+  },
 });
 
-// Fisher-Yates shuffle algorithm for randomizing array order
-const shuffleArray = <T,>(array: T[]): T[] => {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+// Enhanced letter selection logic
+const selectNextChar = (
+  letters: LetterProgress[],
+  lastChar: string | null = null
+): string => {
+  // Don't select the same letter twice in a row if possible
+  const availableLetters = lastChar
+    ? letters.filter((l) => l.char !== lastChar)
+    : letters;
+
+  if (availableLetters.length === 0) return letters[0].char;
+
+  // Calculate weights for each letter
+  const weightedLetters = availableLetters.map((letter) => {
+    // Base selection probability
+    let weight = letter.selectionWeight;
+
+    // 1. Progressive Introduction Weighting
+    const daysSinceIntroduction = daysBetween(
+      new Date(),
+      letter.dateIntroduced
+    );
+    if (daysSinceIntroduction < 7) {
+      weight *= 5 - daysSinceIntroduction * 0.5; // 5x down to 1.5x over a week
+    }
+
+    // 2. Familiarity-Based Scheduling
+    weight *= 1 / (letter.familiarityScore + 0.1); // Inverse relationship
+
+    // 4. Error-Sensitive Boost
+    if (letter.errorPatterns.consecutiveErrors > 0) {
+      weight *= 1 + letter.errorPatterns.consecutiveErrors * 0.5; // Boost by 50% per consecutive error
+    }
+
+    // 5. Time-Decay for new vs old letters
+    const recencyFactor =
+      letter.attempts < 10
+        ? 0.99 // Slower decay for new letters
+        : 0.95; // Faster decay for familiar letters
+
+    const millisecondsSinceLastPracticed =
+      new Date().getTime() - letter.lastPracticed.getTime();
+    const hoursSinceLastPracticed =
+      millisecondsSinceLastPracticed / (1000 * 60 * 60);
+
+    // Boost priority for letters not practiced recently
+    weight *= Math.pow(recencyFactor, -hoursSinceLastPracticed);
+
+    return {
+      char: letter.char,
+      weight,
+    };
+  });
+
+  // Normalize weights
+  const totalWeight = weightedLetters.reduce(
+    (sum, letter) => sum + letter.weight,
+    0
+  );
+  const normalizedLetters = weightedLetters.map((letter) => ({
+    char: letter.char,
+    probability: letter.weight / totalWeight,
+  }));
+
+  // Select based on weighted probability
+  const random = Math.random();
+  let cumulativeProbability = 0;
+
+  for (const letter of normalizedLetters) {
+    cumulativeProbability += letter.probability;
+    if (random <= cumulativeProbability) {
+      return letter.char;
+    }
   }
-  return newArray;
+
+  // Fallback
+  return normalizedLetters[0].char;
+};
+
+// Create interleaved practice session
+const createPracticeSession = (activeLetters: LetterProgress[]): string[] => {
+  // Categorize letters
+  const newLetters = activeLetters.filter((l) => l.attempts < 10);
+  const familiarLetters = activeLetters.filter((l) => l.attempts >= 10);
+
+  // Create interleaved pattern (3. Interleaving Pattern)
+  const sessionQueue: string[] = [];
+
+  // If we have new letters, create interleaved sequence
+  if (newLetters.length > 0) {
+    let lastChar: string | null = null;
+
+    // Start with a new letter
+    const firstChar = selectNextChar(newLetters);
+    sessionQueue.push(firstChar);
+    lastChar = firstChar;
+
+    // Basic pattern: New → Familiar → Familiar → New → Familiar
+    for (let i = 0; i < 5; i++) {
+      // Add familiar letters
+      for (let j = 0; j < 2; j++) {
+        if (familiarLetters.length > 0) {
+          const nextChar = selectNextChar(familiarLetters, lastChar);
+          sessionQueue.push(nextChar);
+          lastChar = nextChar;
+        }
+      }
+
+      // Add a new letter
+      if (newLetters.length > 0) {
+        const nextChar = selectNextChar(newLetters, lastChar);
+        sessionQueue.push(nextChar);
+        lastChar = nextChar;
+      }
+
+      // Add one more familiar
+      if (familiarLetters.length > 0) {
+        const nextChar = selectNextChar(familiarLetters, lastChar);
+        sessionQueue.push(nextChar);
+        lastChar = nextChar;
+      }
+    }
+  } else {
+    // If no new letters, select based on weighted algorithm
+    let lastChar: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      const nextChar = selectNextChar(activeLetters, lastChar);
+      sessionQueue.push(nextChar);
+      lastChar = nextChar;
+    }
+  }
+
+  return sessionQueue;
+};
+
+// Update letter progress with the new metrics
+const updateLetterProgress = (
+  letter: LetterProgress,
+  isCorrect: boolean,
+  pressedKey: string
+): LetterProgress => {
+  // Update attempts and accuracy as before
+  const newAttempts = [...letter.lastAttempts, isCorrect].slice(
+    -ATTEMPTS_WINDOW_SIZE
+  );
+
+  // Update consecutive errors
+  const consecutiveErrors = isCorrect
+    ? 0
+    : letter.errorPatterns.consecutiveErrors + 1;
+
+  // Update familiarity score - exponentially increasing score that represents mastery
+  const familiarityIncrement = isCorrect ? 0.1 : -0.05;
+  const newFamiliarityScore = Math.max(
+    0,
+    letter.familiarityScore + familiarityIncrement
+  );
+
+  // If incorrect, track which letter was confused with this one
+  const confusedWith = { ...letter.errorPatterns.confusedWith };
+  if (!isCorrect) {
+    confusedWith[pressedKey] = (confusedWith[pressedKey] || 0) + 1;
+  }
+
+  // Update successful attempts count if correct
+  let newSuccessfulAttemptsCount = isCorrect
+    ? letter.successfulAttemptsCount + 1
+    : 0;
+
+  // Check if letter needs review (3 or more mistakes in last 5 attempts)
+  const recentAttempts = newAttempts.slice(-5);
+  const recentMistakes = recentAttempts.filter((attempt) => !attempt).length;
+  const needsReview = recentMistakes >= 3;
+
+  // Determine the letter's status
+  let newStatus: LetterStatus = letter.status;
+  let newAttemptsNeeded = letter.successfulAttemptsNeeded;
+
+  // If the letter needs review, reset the count and set to review mode
+  if (needsReview && letter.status !== "review") {
+    newStatus = "review";
+    newAttemptsNeeded = REVIEW_LETTER_ATTEMPTS_NEEDED;
+    newSuccessfulAttemptsCount = 0;
+  }
+
+  // If we've completed the required attempts, move to normal mode
+  if (
+    newSuccessfulAttemptsCount >= newAttemptsNeeded &&
+    (letter.status === "new" || letter.status === "review")
+  ) {
+    newStatus = "normal";
+    newAttemptsNeeded = 0;
+  }
+
+  // Mark letter as visited if the input was correct
+  const newVisitedInCurrentStreak = isCorrect
+    ? true
+    : letter.visitedInCurrentStreak;
+
+  return {
+    ...letter,
+    attempts: letter.attempts + 1,
+    lastAttempts: newAttempts,
+    accuracy:
+      (letter.accuracy * letter.attempts + (isCorrect ? 1 : 0)) /
+      (letter.attempts + 1),
+    status: newStatus,
+    successfulAttemptsNeeded: newAttemptsNeeded,
+    successfulAttemptsCount: newSuccessfulAttemptsCount,
+    visitedInCurrentStreak: newVisitedInCurrentStreak,
+    lastPracticed: new Date(),
+    familiarityScore: newFamiliarityScore,
+    errorPatterns: {
+      consecutiveErrors,
+      confusedWith,
+    },
+    // Recalculate selection weight
+    selectionWeight: calculateSelectionWeight(letter),
+  };
 };
 
 export const DynamicPractice = () => {
@@ -126,24 +381,58 @@ export const DynamicPractice = () => {
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          lastPracticed: new Date(
+            letter.lastPracticed || letter.dateIntroduced
+          ),
           visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
+          // Initialize new properties if they don't exist in saved state
+          familiarityScore: letter.familiarityScore || 0,
+          selectionWeight:
+            letter.selectionWeight || calculateSelectionWeight(letter),
+          errorPatterns: letter.errorPatterns || {
+            consecutiveErrors: 0,
+            confusedWith: {},
+          },
         })
       );
       parsedState.masteredLetters = parsedState.masteredLetters.map(
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          lastPracticed: new Date(
+            letter.lastPracticed || letter.dateIntroduced
+          ),
           visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
+          // Initialize new properties if they don't exist in saved state
+          familiarityScore: letter.familiarityScore || 0,
+          selectionWeight:
+            letter.selectionWeight || calculateSelectionWeight(letter),
+          errorPatterns: letter.errorPatterns || {
+            consecutiveErrors: 0,
+            confusedWith: {},
+          },
         })
       );
       parsedState.nextLettersToAdd = parsedState.nextLettersToAdd.map(
         (letter: LetterProgress) => ({
           ...letter,
           dateIntroduced: new Date(letter.dateIntroduced),
+          lastPracticed: new Date(
+            letter.lastPracticed || letter.dateIntroduced
+          ),
           visitedInCurrentStreak: letter.visitedInCurrentStreak || false,
+          // Initialize new properties if they don't exist in saved state
+          familiarityScore: letter.familiarityScore || 0,
+          selectionWeight:
+            letter.selectionWeight || calculateSelectionWeight(letter),
+          errorPatterns: letter.errorPatterns || {
+            consecutiveErrors: 0,
+            confusedWith: {},
+          },
         })
       );
       parsedState.streakProgress = parsedState.streakProgress || 0;
+      parsedState.sessionQueue = parsedState.sessionQueue || [];
       return parsedState;
     }
     return createInitialState();
@@ -153,6 +442,18 @@ export const DynamicPractice = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  // Generate new session queue if needed
+  useEffect(() => {
+    if (state.sessionQueue.length === 0) {
+      setState((prevState) => ({
+        ...prevState,
+        sessionQueue: createPracticeSession(prevState.activeLetters),
+        currentChar:
+          prevState.currentChar || selectNextChar(prevState.activeLetters),
+      }));
+    }
+  }, [state.sessionQueue]);
 
   const handleReset = useCallback(() => {
     if (
@@ -204,67 +505,28 @@ export const DynamicPractice = () => {
       const isCorrect = pressedKey === state.currentChar;
 
       setState((prevState) => {
-        // Update letter progress
-        const updatedActive = prevState.activeLetters.map((letter) => {
-          if (letter.char === prevState.currentChar) {
-            const newAttempts = [...letter.lastAttempts, isCorrect].slice(
-              -ATTEMPTS_WINDOW_SIZE
-            );
+        // Find the current letter
+        const currentLetterIndex = prevState.activeLetters.findIndex(
+          (l) => l.char === prevState.currentChar
+        );
 
-            // Update successful attempts count if correct
-            let newSuccessfulAttemptsCount = isCorrect
-              ? letter.successfulAttemptsCount + 1
-              : 0;
+        if (currentLetterIndex === -1) return prevState;
 
-            // Check if letter needs review (3 or more mistakes in last 5 attempts)
-            const recentAttempts = newAttempts.slice(-5);
-            const recentMistakes = recentAttempts.filter(
-              (attempt) => !attempt
-            ).length;
-            const needsReview = recentMistakes >= 3;
+        // Update letter progress with new algorithm
+        const updatedLetter = updateLetterProgress(
+          prevState.activeLetters[currentLetterIndex],
+          isCorrect,
+          pressedKey
+        );
 
-            // Determine the letter's status
-            let newStatus: LetterStatus = letter.status;
-            let newAttemptsNeeded = letter.successfulAttemptsNeeded;
+        // Create updated active letters array
+        const updatedActive = [
+          ...prevState.activeLetters.slice(0, currentLetterIndex),
+          updatedLetter,
+          ...prevState.activeLetters.slice(currentLetterIndex + 1),
+        ];
 
-            // If the letter needs review, reset the count and set to review mode
-            if (needsReview && letter.status !== "review") {
-              newStatus = "review";
-              newAttemptsNeeded = REVIEW_LETTER_ATTEMPTS_NEEDED;
-              newSuccessfulAttemptsCount = 0;
-            }
-
-            // If we've completed the required attempts, move to normal mode
-            if (
-              newSuccessfulAttemptsCount >= newAttemptsNeeded &&
-              (letter.status === "new" || letter.status === "review")
-            ) {
-              newStatus = "normal";
-              newAttemptsNeeded = 0;
-            }
-
-            // Mark letter as visited if the input was correct
-            const newVisitedInCurrentStreak = isCorrect
-              ? true
-              : letter.visitedInCurrentStreak;
-
-            return {
-              ...letter,
-              attempts: letter.attempts + 1,
-              lastAttempts: newAttempts,
-              accuracy:
-                (letter.accuracy * letter.attempts + (isCorrect ? 1 : 0)) /
-                (letter.attempts + 1),
-              status: newStatus,
-              successfulAttemptsNeeded: newAttemptsNeeded,
-              successfulAttemptsCount: newSuccessfulAttemptsCount,
-              visitedInCurrentStreak: newVisitedInCurrentStreak,
-            };
-          }
-          return letter;
-        });
-
-        // Only proceed if the input was correct
+        // If incorrect, just update the state and stay on the same letter
         if (!isCorrect) {
           return {
             ...prevState,
@@ -275,53 +537,33 @@ export const DynamicPractice = () => {
           };
         }
 
-        // Find the current letter
-        const currentLetter = updatedActive.find(
-          (l) => l.char === prevState.currentChar
-        );
-
-        // Update streak progress by counting the visited letters
+        // Update streak progress
         let streakProgress = updatedActive.filter(
           (l) => l.visitedInCurrentStreak
         ).length;
 
-        // Check if we've completed a full streak through all active letters
+        // Check if we've completed a full streak
         const isStreakComplete = streakProgress === updatedActive.length;
 
-        // Reset streak and randomize order if streak is complete
-        let randomizedActive = updatedActive;
+        // Reset streak and generate new session if streak is complete
+        let newSessionQueue = [...prevState.sessionQueue];
         if (isStreakComplete) {
-          // Shuffle the array using Fisher-Yates algorithm
-          randomizedActive = shuffleArray(updatedActive).map((letter) => ({
+          // Reset visited status for the new streak
+          const resetLetters = updatedActive.map((letter) => ({
             ...letter,
-            visitedInCurrentStreak: false, // Reset visited status for the new streak
+            visitedInCurrentStreak: false,
           }));
-          streakProgress = 0; // Reset streak progress
-        }
 
-        // If the letter is still in new or review mode and needs more successful attempts,
-        // stay on it
-        if (
-          currentLetter &&
-          (currentLetter.status === "new" ||
-            currentLetter.status === "review") &&
-          currentLetter.successfulAttemptsCount <
-            currentLetter.successfulAttemptsNeeded
-        ) {
-          return {
-            ...prevState,
-            activeLetters: isStreakComplete ? randomizedActive : updatedActive,
-            lastKeyPressed: pressedKey,
-            isCorrect,
-            sessionAttempts: prevState.sessionAttempts + 1,
-            sessionCorrect: prevState.sessionCorrect + 1,
-            streakProgress: streakProgress,
-          };
+          // Generate new session queue
+          newSessionQueue = createPracticeSession(resetLetters);
+          streakProgress = 0;
         }
 
         // Check if we should add new letters
-        const lettersToAdd = checkProgression(randomizedActive);
-        let newActive = isStreakComplete ? randomizedActive : updatedActive;
+        const lettersToAdd = checkProgression(updatedActive);
+        let newActive = isStreakComplete
+          ? updatedActive.map((l) => ({ ...l, visitedInCurrentStreak: false }))
+          : updatedActive;
         let newNext = prevState.nextLettersToAdd;
         let newLastLetterAddedAttempt = prevState.lastLetterAddedAttempt;
 
@@ -339,45 +581,29 @@ export const DynamicPractice = () => {
               successfulAttemptsNeeded: NEW_LETTER_ATTEMPTS_NEEDED,
               successfulAttemptsCount: 0,
               visitedInCurrentStreak: false,
+              familiarityScore: 0,
+              lastPracticed: new Date(),
+              selectionWeight: calculateSelectionWeight(letter),
+              errorPatterns: {
+                consecutiveErrors: 0,
+                confusedWith: {},
+              },
             }));
           newActive = [...newActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
           newLastLetterAddedAttempt = prevState.sessionAttempts;
+
+          // Generate new session queue if adding new letters
+          newSessionQueue = createPracticeSession(newActive);
         }
 
-        // Find next character to practice
-        let nextChar;
-
-        // First, look for any letters that need review
-        const reviewLetter = newActive.find(
-          (l) => l.status === "review" && !l.visitedInCurrentStreak
-        );
-        if (reviewLetter) {
-          nextChar = reviewLetter.char;
+        // Get next character from queue or generate if empty
+        let nextChar: string;
+        if (newSessionQueue.length > 0) {
+          nextChar = newSessionQueue[0];
+          newSessionQueue = newSessionQueue.slice(1);
         } else {
-          // Then look for new letters
-          const newLetter = newActive.find(
-            (l) => l.status === "new" && !l.visitedInCurrentStreak
-          );
-          if (newLetter) {
-            nextChar = newLetter.char;
-          } else {
-            // Then look for any unvisited normal letters
-            const unvisitedLetter = newActive.find(
-              (l) => !l.visitedInCurrentStreak
-            );
-            if (unvisitedLetter) {
-              nextChar = unvisitedLetter.char;
-            } else {
-              // If all letters have been visited (shouldn't happen due to reset above)
-              // just move to the next letter in sequence
-              const currentIndex = newActive.findIndex(
-                (l) => l.char === prevState.currentChar
-              );
-              const nextIndex = (currentIndex + 1) % newActive.length;
-              nextChar = newActive[nextIndex].char;
-            }
-          }
+          nextChar = selectNextChar(newActive, prevState.currentChar);
         }
 
         return {
@@ -391,6 +617,7 @@ export const DynamicPractice = () => {
           sessionCorrect: prevState.sessionCorrect + 1,
           streakProgress: streakProgress,
           lastLetterAddedAttempt: newLastLetterAddedAttempt,
+          sessionQueue: newSessionQueue,
         };
       });
     },
@@ -483,7 +710,7 @@ export const DynamicPractice = () => {
                     letter.successfulAttemptsCount
                   }/${letter.successfulAttemptsNeeded}`
                 : ""
-            }`}
+            } | Familiarity: ${letter.familiarityScore.toFixed(1)}`}
           >
             {letter.char}
             {(letter.status === "new" || letter.status === "review") && (
