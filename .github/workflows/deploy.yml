@@ -10,6 +10,9 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
+  checks: read
+  deployments: write
 
 # Allow only one concurrent deployment
 concurrency:
@@ -60,10 +63,19 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Debug - List directories
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Contents of current directory:"
+          ls -la
+          echo "Contents of dist directory:"
+          ls -la dist || echo "dist directory not found"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: dist
 
   deploy:
     environment:
