@@ -35,9 +35,11 @@ interface LetterProgress {
   frequency: number;
   accuracy: number;
   attempts: number;
-  lastAttempts: boolean[]; // Rolling window of recent attempts
+  lastAttempts: boolean[];
   mastered: boolean;
   dateIntroduced: Date;
+  isNew: boolean;
+  successfulNewAttempts: number;
 }
 
 interface PracticeState {
@@ -83,6 +85,8 @@ const createLetterProgress = (
   lastAttempts: [],
   mastered: false,
   dateIntroduced: new Date(),
+  isNew: true,
+  successfulNewAttempts: 0,
 });
 
 export const DynamicPractice = () => {
@@ -168,6 +172,12 @@ export const DynamicPractice = () => {
             const newAttempts = [...letter.lastAttempts, isCorrect].slice(
               -ATTEMPTS_WINDOW_SIZE
             );
+            const isNewLetter = letter.isNew;
+            const newSuccessfulAttempts =
+              isNewLetter && isCorrect
+                ? letter.successfulNewAttempts + 1
+                : letter.successfulNewAttempts;
+
             return {
               ...letter,
               attempts: letter.attempts + 1,
@@ -175,6 +185,8 @@ export const DynamicPractice = () => {
               accuracy:
                 (letter.accuracy * letter.attempts + (isCorrect ? 1 : 0)) /
                 (letter.attempts + 1),
+              successfulNewAttempts: newSuccessfulAttempts,
+              isNew: isNewLetter && newSuccessfulAttempts < 5,
             };
           }
           return letter;
@@ -191,7 +203,24 @@ export const DynamicPractice = () => {
           };
         }
 
-        // Check if we should add new letters - do this check more frequently
+        // Find the current letter
+        const currentLetter = updatedActive.find(
+          (l) => l.char === prevState.currentChar
+        );
+
+        // If it's a new letter and we haven't hit 5 successful attempts, stay on it
+        if (currentLetter?.isNew && currentLetter.successfulNewAttempts < 5) {
+          return {
+            ...prevState,
+            activeLetters: updatedActive,
+            lastKeyPressed: pressedKey,
+            isCorrect,
+            sessionAttempts: prevState.sessionAttempts + 1,
+            sessionCorrect: prevState.sessionCorrect + 1,
+          };
+        }
+
+        // Check if we should add new letters
         const lettersToAdd = checkProgression(updatedActive);
         let newActive = updatedActive;
         let newNext = prevState.nextLettersToAdd;
@@ -206,22 +235,33 @@ export const DynamicPractice = () => {
               lastAttempts: [],
               mastered: false,
               dateIntroduced: new Date(),
+              isNew: true,
+              successfulNewAttempts: 0,
             }));
           newActive = [...updatedActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
         }
 
-        // Find the current letter's index and move to the next one
-        const currentIndex = newActive.findIndex(
-          (l) => l.char === prevState.currentChar
-        );
-        const nextIndex = (currentIndex + 1) % newActive.length;
+        // Find next character to practice
+        let nextChar;
+        // First, look for any new letters that haven't been practiced 5 times
+        const newLetter = newActive.find((l) => l.isNew);
+        if (newLetter) {
+          nextChar = newLetter.char;
+        } else {
+          // If no new letters, move to next in sequence
+          const currentIndex = newActive.findIndex(
+            (l) => l.char === prevState.currentChar
+          );
+          const nextIndex = (currentIndex + 1) % newActive.length;
+          nextChar = newActive[nextIndex].char;
+        }
 
         return {
           ...prevState,
           activeLetters: newActive,
           nextLettersToAdd: newNext,
-          currentChar: newActive[nextIndex].char,
+          currentChar: nextChar,
           lastKeyPressed: pressedKey,
           isCorrect,
           sessionAttempts: prevState.sessionAttempts + 1,
@@ -255,6 +295,34 @@ export const DynamicPractice = () => {
         }`}
       >
         {state.currentChar}
+        {state.activeLetters.find((l) => l.char === state.currentChar)
+          ?.isNew && (
+          <div className="new-letter-progress">
+            <div className="progress-text">
+              New Letter:{" "}
+              {
+                state.activeLetters.find((l) => l.char === state.currentChar)
+                  ?.successfulNewAttempts
+              }{" "}
+              / 5
+            </div>
+            <div className="progress-dots">
+              {[...Array(5)].map((_, i) => (
+                <span
+                  key={i}
+                  className={`progress-dot ${
+                    i <
+                    (state.activeLetters.find(
+                      (l) => l.char === state.currentChar
+                    )?.successfulNewAttempts || 0)
+                      ? "completed"
+                      : ""
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="last-key-display">
         Last Key:{" "}
@@ -276,10 +344,15 @@ export const DynamicPractice = () => {
             key={letter.char}
             className={`letter-indicator ${
               letter.char === state.currentChar ? "current" : ""
+            } ${letter.isNew ? "new" : ""}`}
+            title={`Accuracy: ${Math.round(letter.accuracy * 100)}%${
+              letter.isNew ? ` | New: ${letter.successfulNewAttempts}/5` : ""
             }`}
-            title={`Accuracy: ${Math.round(letter.accuracy * 100)}%`}
           >
             {letter.char}
+            {letter.isNew && (
+              <span className="new-badge">{letter.successfulNewAttempts}</span>
+            )}
           </span>
         ))}
       </div>

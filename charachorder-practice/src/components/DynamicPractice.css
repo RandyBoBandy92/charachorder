@@ -165,3 +165,59 @@
 .reset-button:active {
   transform: translateY(1px);
 }
+
+.new-letter-progress {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 1rem;
+  color: #4a5568;
+}
+
+.progress-text {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.progress-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  border: 2px solid #cbd5e0;
+  transition: all 0.2s ease;
+}
+
+.progress-dot.completed {
+  background-color: #48bb78;
+  border-color: #38a169;
+}
+
+.letter-indicator.new {
+  background-color: #ebf4ff;
+  border: 2px solid #4299e1;
+  position: relative;
+}
+
+.new-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #4299e1;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
