@@ -1,0 +1,136 @@
+.character-practice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-indicator {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 2rem;
+  font-weight: bold;
+  background-color: #e6fffa;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #b2f5ea;
+}
+
+.character-display {
+  font-size: 8rem;
+  font-weight: bold;
+  height: 200px;
+  width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  transition: all 0.2s ease;
+}
+
+.character-display.incorrect {
+  background-color: #ffe6e6;
+  animation: shake 0.5s;
+}
+
+.consecutive-indicator {
+  font-size: 1.4rem;
+  color: #2c5282;
+  margin-bottom: 1rem;
+  font-weight: bold;
+  background-color: #ebf8ff;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  border: 2px solid #bee3f8;
+}
+
+.sequence-display {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.sequence-char {
+  font-size: 1.2rem;
+  font-weight: bold;
+  padding: 0.5rem 0.8rem;
+  border-radius: 4px;
+  background-color: #edf2f7;
+  color: #4a5568;
+  transition: all 0.2s ease;
+}
+
+.sequence-char.current {
+  background-color: #4299e1;
+  color: white;
+  transform: scale(1.1);
+}
+
+.sequence-char.completed {
+  background-color: #48bb78;
+  color: white;
+}
+
+.instructions {
+  font-size: 1.4rem;
+  color: #444;
+  margin-bottom: 2rem;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.stats {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.last-key-display {
+  font-size: 1.4rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1.5rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.last-key-display span {
+  font-weight: bold;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  margin-left: 0.5rem;
+}
+
+.last-key-display span.correct {
+  background-color: #c6f6d5;
+  color: #2f855a;
+}
+
+.last-key-display span.incorrect {
+  background-color: #fed7d7;
+  color: #c53030;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
