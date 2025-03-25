@@ -159,7 +159,20 @@ const selectNextChar = (
     ? letters.filter((l) => l.char !== lastChar)
     : letters;
 
-  if (availableLetters.length === 0) return letters[0].char;
+  // If filtering out the last character leaves us with no options, use all letters
+  if (availableLetters.length === 0) {
+    if (letters.length > 1) {
+      console.warn(
+        "No available letters after filtering, but multiple letters exist. This should not happen."
+      );
+    }
+    return letters[0].char;
+  }
+
+  // If we only have one available letter, return it directly
+  if (availableLetters.length === 1) {
+    return availableLetters[0].char;
+  }
 
   // Calculate weights for each letter
   const weightedLetters = availableLetters.map((letter) => {
@@ -281,6 +294,34 @@ const createPracticeSession = (activeLetters: LetterProgress[]): string[] => {
     }
   }
 
+  // Final check: scan the queue for any consecutive repeats and fix them
+  for (let i = 1; i < sessionQueue.length; i++) {
+    if (sessionQueue[i] === sessionQueue[i - 1]) {
+      // Found a repeat - try to replace it with a different letter
+      const currentChar = sessionQueue[i];
+      const availableLetters = activeLetters.filter(
+        (l) => l.char !== currentChar
+      );
+
+      if (availableLetters.length > 0) {
+        // Find a replacement that's different from both current and next (if possible)
+        const nextChar =
+          i < sessionQueue.length - 1 ? sessionQueue[i + 1] : null;
+        const replacementCandidates = availableLetters.filter(
+          (l) => nextChar === null || l.char !== nextChar
+        );
+
+        if (replacementCandidates.length > 0) {
+          // Pick a replacement using the selection algorithm
+          sessionQueue[i] = selectNextChar(replacementCandidates, currentChar);
+        } else {
+          // If no good candidates, just pick any different letter
+          sessionQueue[i] = selectNextChar(availableLetters, currentChar);
+        }
+      }
+    }
+  }
+
   return sessionQueue;
 };
 
@@ -316,7 +357,7 @@ const updateLetterProgress = (
   // Update successful attempts count if correct
   let newSuccessfulAttemptsCount = isCorrect
     ? letter.successfulAttemptsCount + 1
-    : 0;
+    : letter.successfulAttemptsCount; // Don't reset on incorrect - keep count
 
   // Check if letter needs review (3 or more mistakes in last 5 attempts)
   const recentAttempts = newAttempts.slice(-5);
@@ -341,6 +382,8 @@ const updateLetterProgress = (
   ) {
     newStatus = "normal";
     newAttemptsNeeded = 0;
+    // Reset successful attempts count when transitioning to normal
+    newSuccessfulAttemptsCount = 0;
   }
 
   // Mark letter as visited if the input was correct
@@ -599,11 +642,48 @@ export const DynamicPractice = () => {
 
         // Get next character from queue or generate if empty
         let nextChar: string;
-        if (newSessionQueue.length > 0) {
-          nextChar = newSessionQueue[0];
-          newSessionQueue = newSessionQueue.slice(1);
+
+        // Check if the current letter needs more practice
+        const needsMorePractice =
+          (updatedLetter.status === "new" ||
+            updatedLetter.status === "review") &&
+          updatedLetter.successfulAttemptsCount <
+            updatedLetter.successfulAttemptsNeeded;
+
+        // Debug log to help diagnose issues
+        console.log(
+          `Letter: ${updatedLetter.char}, Status: ${updatedLetter.status}, Successful attempts: ${updatedLetter.successfulAttemptsCount}/${updatedLetter.successfulAttemptsNeeded}, Needs more practice: ${needsMorePractice}`
+        );
+
+        if (needsMorePractice) {
+          // Stay on the current letter until it has enough successful attempts
+          nextChar = updatedLetter.char;
         } else {
-          nextChar = selectNextChar(newActive, prevState.currentChar);
+          // Move to next letter in queue
+          if (newSessionQueue.length > 0) {
+            // Get the next character from the queue
+            nextChar = newSessionQueue[0];
+            newSessionQueue = newSessionQueue.slice(1);
+
+            // If we got the same character again, try the next one in the queue
+            if (nextChar === updatedLetter.char && newSessionQueue.length > 0) {
+              nextChar = newSessionQueue[0];
+              newSessionQueue = newSessionQueue.slice(1);
+            }
+          } else {
+            // When queue is empty, explicitly exclude the current letter
+            const availableLetters = newActive.filter(
+              (l) => l.char !== updatedLetter.char
+            );
+
+            // Only use selectNextChar with filtered letters if we have alternatives
+            if (availableLetters.length > 0) {
+              nextChar = selectNextChar(availableLetters, null);
+            } else {
+              // If there's only one letter, we have no choice but to reuse it
+              nextChar = selectNextChar(newActive, null);
+            }
+          }
         }
 
         return {
