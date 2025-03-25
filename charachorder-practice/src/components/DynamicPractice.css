@@ -97,6 +97,28 @@
   transform: scale(1.1);
 }
 
+.letter-indicator.needs-review {
+  background-color: #fff5f5;
+  border: 2px solid #f56565;
+  position: relative;
+}
+
+.review-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background-color: #f56565;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
 .next-letters {
   font-size: 1.1rem;
   color: #718096;

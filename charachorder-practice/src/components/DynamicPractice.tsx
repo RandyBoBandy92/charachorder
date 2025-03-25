@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { StatsDashboard } from "./StatsDashboard";
+import "./DynamicPractice.css";
 
 // All letters with frequency data
 const ALL_LETTERS = [
@@ -30,7 +32,7 @@ const ALL_LETTERS = [
   { char: "Q", frequency: 0.1962 },
 ];
 
-interface LetterProgress {
+export interface LetterProgress {
   char: string;
   frequency: number;
   accuracy: number;
@@ -40,6 +42,8 @@ interface LetterProgress {
   dateIntroduced: Date;
   isNew: boolean;
   successfulNewAttempts: number;
+  needsReview: boolean;
+  reviewAttempts: number;
 }
 
 interface PracticeState {
@@ -87,6 +91,8 @@ const createLetterProgress = (
   dateIntroduced: new Date(),
   isNew: true,
   successfulNewAttempts: 0,
+  needsReview: false,
+  reviewAttempts: 0,
 });
 
 export const DynamicPractice = () => {
@@ -178,6 +184,21 @@ export const DynamicPractice = () => {
                 ? letter.successfulNewAttempts + 1
                 : letter.successfulNewAttempts;
 
+            // Check if letter needs review (3 or more mistakes in last 5 attempts)
+            const recentAttempts = newAttempts.slice(-5);
+            const recentMistakes = recentAttempts.filter(
+              (attempt) => !attempt
+            ).length;
+            const needsReview = recentMistakes >= 3;
+
+            // Update review attempts if in review mode
+            const reviewAttempts =
+              letter.needsReview && isCorrect
+                ? letter.reviewAttempts + 1
+                : needsReview
+                ? 0
+                : letter.reviewAttempts;
+
             return {
               ...letter,
               attempts: letter.attempts + 1,
@@ -187,6 +208,9 @@ export const DynamicPractice = () => {
                 (letter.attempts + 1),
               successfulNewAttempts: newSuccessfulAttempts,
               isNew: isNewLetter && newSuccessfulAttempts < 5,
+              needsReview:
+                needsReview || (letter.needsReview && reviewAttempts < 5),
+              reviewAttempts: reviewAttempts,
             };
           }
           return letter;
@@ -220,6 +244,18 @@ export const DynamicPractice = () => {
           };
         }
 
+        // If letter needs review and hasn't completed 5 successful review attempts, stay on it
+        if (currentLetter?.needsReview && currentLetter.reviewAttempts < 5) {
+          return {
+            ...prevState,
+            activeLetters: updatedActive,
+            lastKeyPressed: pressedKey,
+            isCorrect,
+            sessionAttempts: prevState.sessionAttempts + 1,
+            sessionCorrect: prevState.sessionCorrect + 1,
+          };
+        }
+
         // Check if we should add new letters
         const lettersToAdd = checkProgression(updatedActive);
         let newActive = updatedActive;
@@ -237,6 +273,8 @@ export const DynamicPractice = () => {
               dateIntroduced: new Date(),
               isNew: true,
               successfulNewAttempts: 0,
+              needsReview: false,
+              reviewAttempts: 0,
             }));
           newActive = [...updatedActive, ...newLetters];
           newNext = prevState.nextLettersToAdd.slice(lettersToAdd);
@@ -244,17 +282,23 @@ export const DynamicPractice = () => {
 
         // Find next character to practice
         let nextChar;
-        // First, look for any new letters that haven't been practiced 5 times
-        const newLetter = newActive.find((l) => l.isNew);
-        if (newLetter) {
-          nextChar = newLetter.char;
+        // First, look for any letters that need review
+        const reviewLetter = newActive.find((l) => l.needsReview);
+        if (reviewLetter) {
+          nextChar = reviewLetter.char;
         } else {
-          // If no new letters, move to next in sequence
-          const currentIndex = newActive.findIndex(
-            (l) => l.char === prevState.currentChar
-          );
-          const nextIndex = (currentIndex + 1) % newActive.length;
-          nextChar = newActive[nextIndex].char;
+          // Then look for new letters
+          const newLetter = newActive.find((l) => l.isNew);
+          if (newLetter) {
+            nextChar = newLetter.char;
+          } else {
+            // If no review or new letters, move to next in sequence
+            const currentIndex = newActive.findIndex(
+              (l) => l.char === prevState.currentChar
+            );
+            const nextIndex = (currentIndex + 1) % newActive.length;
+            nextChar = newActive[nextIndex].char;
+          }
         }
 
         return {
@@ -278,11 +322,6 @@ export const DynamicPractice = () => {
       window.removeEventListener("keypress", handleKeyPress);
     };
   }, [handleKeyPress]);
-
-  const accuracy =
-    state.sessionAttempts > 0
-      ? Math.round((state.sessionCorrect / state.sessionAttempts) * 100)
-      : 0;
 
   return (
     <div className="dynamic-practice">
@@ -363,10 +402,11 @@ export const DynamicPractice = () => {
           .map((l) => l.char)
           .join(", ")}
       </div>
-      <div className="stats">
-        <div>Accuracy: {accuracy}%</div>
-        <div>Session Attempts: {state.sessionAttempts}</div>
-      </div>
+      <StatsDashboard
+        activeLetters={state.activeLetters}
+        sessionAttempts={state.sessionAttempts}
+        sessionCorrect={state.sessionCorrect}
+      />
       <div className="reset-section">
         <button className="reset-button" onClick={handleReset}>
           Reset Progress
