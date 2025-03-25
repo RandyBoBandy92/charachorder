@@ -77,7 +77,7 @@ const INITIAL_LETTER_COUNT = 5;
 const ATTEMPTS_WINDOW_SIZE = 20;
 const NEW_LETTER_ATTEMPTS_NEEDED = 5;
 const REVIEW_LETTER_ATTEMPTS_NEEDED = 5;
-const MIN_ATTEMPTS_BEFORE_ADDING_LETTERS = 15; // Minimum attempts before adding more letters
+const MIN_ATTEMPTS_BEFORE_ADDING_LETTERS = 25; // Minimum attempts before adding more letters
 
 // Helper function to calculate days between two dates
 const daysBetween = (date1: Date, date2: Date): number => {
