@@ -2,12 +2,38 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 60vh;
+  justify-content: flex-start;
   padding: 2rem;
   background-color: #f5f5f5;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 60vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Main container for responsive layout */
+.practice-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1200px;
+  gap: 2rem;
+  transition: all 0.3s ease;
+}
+
+/* Practice area that contains the typing interface */
+.practice-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Stats area */
+.stats-area {
+  width: 100%;
+  overflow: hidden;
 }
 
 .progress-indicator {
@@ -22,6 +48,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
 }
 
 .streak-info {
@@ -93,6 +120,7 @@
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   max-width: 600px;
+  width: 100%;
 }
 
 .letter-indicator {
@@ -263,4 +291,29 @@
 .progress-dot.completed {
   background-color: #48bb78;
   border-color: #38a169;
+}
+
+/* Responsive layout for larger screens */
+@media (min-width: 992px) {
+  .practice-container {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .practice-area {
+    flex: 1;
+    max-width: 60%;
+  }
+
+  .stats-area {
+    flex: 1;
+    max-width: 40%;
+    position: sticky;
+    top: 2rem;
+    align-self: flex-start;
+  }
+
+  .reset-section {
+    margin-top: 2rem;
+  }
 }

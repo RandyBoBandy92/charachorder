@@ -725,98 +725,110 @@ export const DynamicPractice = () => {
 
   return (
     <div className="dynamic-practice">
-      <div className="progress-indicator">
-        Active Letters: {state.activeLetters.length} / {ALL_LETTERS.length}
-        <div className="streak-info">
-          Streak: {state.streakProgress} / {state.activeLetters.length}
-        </div>
-      </div>
-      <div
-        className={`character-display ${
-          state.isCorrect === false ? "incorrect" : ""
-        }`}
-      >
-        {state.currentChar}
-        {currentLetter &&
-          (currentLetter.status === "new" ||
-            currentLetter.status === "review") && (
-            <div className={`letter-progress ${currentLetter.status}`}>
-              <div className="progress-text">
-                {getProgressText(currentLetter)}:{" "}
-                {currentLetter.successfulAttemptsCount} /{" "}
-                {currentLetter.successfulAttemptsNeeded}
-              </div>
-              <div className="progress-dots">
-                {[...Array(currentLetter.successfulAttemptsNeeded)].map(
-                  (_, i) => (
-                    <span
-                      key={i}
-                      className={`progress-dot ${
-                        i < currentLetter.successfulAttemptsCount
-                          ? "completed"
-                          : ""
-                      }`}
-                    />
-                  )
-                )}
-              </div>
+      <div className="practice-container">
+        <div className="practice-area">
+          <div className="progress-indicator">
+            Active Letters: {state.activeLetters.length} / {ALL_LETTERS.length}
+            <div className="streak-info">
+              Streak: {state.streakProgress} / {state.activeLetters.length}
             </div>
-          )}
-      </div>
-      <div className="last-key-display">
-        Last Key:{" "}
-        <span
-          className={
-            state.isCorrect === false
-              ? "incorrect"
-              : state.isCorrect
-              ? "correct"
-              : ""
-          }
-        >
-          {state.lastKeyPressed || "None"}
-        </span>
-      </div>
-      <div className="active-letters">
-        {state.activeLetters.map((letter) => (
-          <span
-            key={letter.char}
-            className={`letter-indicator ${
-              letter.char === state.currentChar ? "current" : ""
-            } ${letter.status}`}
-            title={`Accuracy: ${Math.round(letter.accuracy * 100)}%${
-              letter.status !== "normal"
-                ? ` | ${getProgressText(letter)}: ${
-                    letter.successfulAttemptsCount
-                  }/${letter.successfulAttemptsNeeded}`
-                : ""
-            } | Familiarity: ${letter.familiarityScore.toFixed(1)}`}
+          </div>
+
+          <div
+            className={`character-display ${
+              state.isCorrect === false ? "incorrect" : ""
+            }`}
           >
-            {letter.char}
-            {(letter.status === "new" || letter.status === "review") && (
-              <span className={`status-badge ${letter.status}`}>
-                {letter.successfulAttemptsCount}
+            {state.currentChar}
+            {currentLetter &&
+              (currentLetter.status === "new" ||
+                currentLetter.status === "review") && (
+                <div className={`letter-progress ${currentLetter.status}`}>
+                  <div className="progress-text">
+                    {getProgressText(currentLetter)}:{" "}
+                    {currentLetter.successfulAttemptsCount} /{" "}
+                    {currentLetter.successfulAttemptsNeeded}
+                  </div>
+                  <div className="progress-dots">
+                    {[...Array(currentLetter.successfulAttemptsNeeded)].map(
+                      (_, i) => (
+                        <span
+                          key={i}
+                          className={`progress-dot ${
+                            i < currentLetter.successfulAttemptsCount
+                              ? "completed"
+                              : ""
+                          }`}
+                        />
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+          </div>
+
+          <div className="last-key-display">
+            Last Key:{" "}
+            <span
+              className={
+                state.isCorrect === false
+                  ? "incorrect"
+                  : state.isCorrect
+                  ? "correct"
+                  : ""
+              }
+            >
+              {state.lastKeyPressed || "None"}
+            </span>
+          </div>
+
+          <div className="active-letters">
+            {state.activeLetters.map((letter) => (
+              <span
+                key={letter.char}
+                className={`letter-indicator ${
+                  letter.char === state.currentChar ? "current" : ""
+                } ${letter.status}`}
+                title={`Accuracy: ${Math.round(letter.accuracy * 100)}%${
+                  letter.status !== "normal"
+                    ? ` | ${getProgressText(letter)}: ${
+                        letter.successfulAttemptsCount
+                      }/${letter.successfulAttemptsNeeded}`
+                    : ""
+                } | Familiarity: ${letter.familiarityScore.toFixed(1)}`}
+              >
+                {letter.char}
+                {(letter.status === "new" || letter.status === "review") && (
+                  <span className={`status-badge ${letter.status}`}>
+                    {letter.successfulAttemptsCount}
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        ))}
-      </div>
-      <div className="next-letters">
-        Next up:{" "}
-        {state.nextLettersToAdd
-          .slice(0, 3)
-          .map((l) => l.char)
-          .join(", ")}
-      </div>
-      <StatsDashboard
-        activeLetters={state.activeLetters}
-        sessionAttempts={state.sessionAttempts}
-        sessionCorrect={state.sessionCorrect}
-      />
-      <div className="reset-section">
-        <button className="reset-button" onClick={handleReset}>
-          Reset Progress
-        </button>
+            ))}
+          </div>
+
+          <div className="next-letters">
+            Next up:{" "}
+            {state.nextLettersToAdd
+              .slice(0, 3)
+              .map((l) => l.char)
+              .join(", ")}
+          </div>
+
+          <div className="reset-section">
+            <button className="reset-button" onClick={handleReset}>
+              Reset Progress
+            </button>
+          </div>
+        </div>
+
+        <div className="stats-area">
+          <StatsDashboard
+            activeLetters={state.activeLetters}
+            sessionAttempts={state.sessionAttempts}
+            sessionCorrect={state.sessionCorrect}
+          />
+        </div>
       </div>
     </div>
   );
