@@ -174,6 +174,13 @@ export const AnkiMemorySystem = () => {
     return createInitialState();
   });
 
+  // Add activeTab state
+  const [activeTab, setActiveTab] = useState<"practice" | "view-deck">(
+    "practice"
+  );
+  // Add selectedCard state for the View Deck tab
+  const [selectedCard, setSelectedCard] = useState<CardState | null>(null);
+
   // Save state to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -187,6 +194,42 @@ export const AnkiMemorySystem = () => {
       )
     ) {
       setState(createInitialState());
+    }
+  }, []);
+
+  // Reset progress for a single card
+  const handleResetCard = useCallback((cardChar: string) => {
+    if (
+      window.confirm(
+        `Are you sure you want to reset progress for the letter "${cardChar}"? This cannot be undone.`
+      )
+    ) {
+      setState((prevState) => {
+        // Find the letter in ALL_LETTERS
+        const letterData = ALL_LETTERS.find((l) => l.char === cardChar);
+        if (!letterData) return prevState;
+
+        // Create a new card
+        const newCard = createCard(letterData);
+
+        // Update the card in the list
+        const updatedCards = prevState.cards.map((card) =>
+          card.char === cardChar ? newCard : card
+        );
+
+        return {
+          ...prevState,
+          cards: updatedCards,
+          // If the active card was reset, update it too
+          activeCard:
+            prevState.activeCard?.char === cardChar
+              ? newCard
+              : prevState.activeCard,
+        };
+      });
+
+      // Clear selection after reset
+      setSelectedCard(null);
     }
   }, []);
 
@@ -457,8 +500,23 @@ export const AnkiMemorySystem = () => {
 
   return (
     <div className="anki-memory-system">
-      {state.activeCard && (
-        <>
+      <div className="tab-navigation">
+        <button
+          className={`tab-button ${activeTab === "practice" ? "active" : ""}`}
+          onClick={() => setActiveTab("practice")}
+        >
+          Practice
+        </button>
+        <button
+          className={`tab-button ${activeTab === "view-deck" ? "active" : ""}`}
+          onClick={() => setActiveTab("view-deck")}
+        >
+          View Deck
+        </button>
+      </div>
+
+      {activeTab === "practice" && state.activeCard && (
+        <div className="practice-tab">
           <div className="progress-indicator">
             {formatNextReviewTime(state.activeCard.nextReviewTime)}
             <div>Card Status: {state.activeCard.state}</div>
@@ -500,28 +558,28 @@ export const AnkiMemorySystem = () => {
             <div className="rating-buttons">
               <button
                 className="rating-button again"
-                onClick={() => handleRating(1)}
+                onClick={() => handleRating(1 as 1 | 2 | 3 | 4)}
               >
                 Again
                 <span className="shortcut">1</span>
               </button>
               <button
                 className="rating-button hard"
-                onClick={() => handleRating(2)}
+                onClick={() => handleRating(2 as 1 | 2 | 3 | 4)}
               >
                 Hard
                 <span className="shortcut">2</span>
               </button>
               <button
                 className="rating-button good"
-                onClick={() => handleRating(3)}
+                onClick={() => handleRating(3 as 1 | 2 | 3 | 4)}
               >
                 Good
                 <span className="shortcut">3</span>
               </button>
               <button
                 className="rating-button easy"
-                onClick={() => handleRating(4)}
+                onClick={() => handleRating(4 as 1 | 2 | 3 | 4)}
               >
                 Easy
                 <span className="shortcut">4</span>
@@ -554,9 +612,110 @@ export const AnkiMemorySystem = () => {
           </div>
 
           <button onClick={handleReset} style={{ marginTop: "2rem" }}>
-            Reset Progress
+            Reset All Progress
           </button>
-        </>
+        </div>
+      )}
+
+      {activeTab === "view-deck" && (
+        <div className="view-deck-tab">
+          <table className="deck-table">
+            <thead>
+              <tr>
+                <th>Letter</th>
+                <th>Next Review</th>
+                <th>Accuracy</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...state.cards]
+                .sort((a, b) => a.nextReviewTime - b.nextReviewTime)
+                .map((card) => (
+                  <tr
+                    key={card.char}
+                    onClick={() =>
+                      setSelectedCard(
+                        selectedCard?.char === card.char ? null : card
+                      )
+                    }
+                    className={
+                      selectedCard?.char === card.char ? "selected" : ""
+                    }
+                  >
+                    <td className="letter-cell">{card.char}</td>
+                    <td>{formatNextReviewTime(card.nextReviewTime)}</td>
+                    <td>
+                      {card.totalAttempts > 0
+                        ? Math.round(
+                            (card.correctAttempts / card.totalAttempts) * 100
+                          )
+                        : 0}
+                      %
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+
+          {selectedCard && (
+            <div className="card-details">
+              <h3>Details for Letter: {selectedCard.char}</h3>
+              <div className="details-grid">
+                <div>
+                  <strong>Status:</strong> {selectedCard.state}
+                </div>
+                <div>
+                  <strong>Frequency:</strong>{" "}
+                  {selectedCard.frequency.toFixed(2)}%
+                </div>
+                <div>
+                  <strong>Current Interval:</strong> {selectedCard.interval}{" "}
+                  minutes
+                </div>
+                <div>
+                  <strong>Next Review:</strong>{" "}
+                  {formatNextReviewTime(selectedCard.nextReviewTime)}
+                </div>
+                <div>
+                  <strong>Last Reviewed:</strong>{" "}
+                  {selectedCard.lastReviewed
+                    ? new Date(selectedCard.lastReviewed).toLocaleString()
+                    : "Never"}
+                </div>
+                <div>
+                  <strong>Ease Factor:</strong> {selectedCard.ease.toFixed(2)}
+                </div>
+                <div>
+                  <strong>Total Attempts:</strong> {selectedCard.totalAttempts}
+                </div>
+                <div>
+                  <strong>Correct Attempts:</strong>{" "}
+                  {selectedCard.correctAttempts}
+                </div>
+                <div>
+                  <strong>Accuracy:</strong>{" "}
+                  {selectedCard.totalAttempts > 0
+                    ? Math.round(
+                        (selectedCard.correctAttempts /
+                          selectedCard.totalAttempts) *
+                          100
+                      )
+                    : 0}
+                  %
+                </div>
+              </div>
+              <button
+                className="reset-card-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResetCard(selectedCard.char);
+                }}
+              >
+                Reset Progress for this Letter
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
