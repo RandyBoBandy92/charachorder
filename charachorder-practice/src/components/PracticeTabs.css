@@ -1,41 +1,85 @@
 .practice-tabs {
-  width: 100%;
-  margin: 0 auto;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .tab-buttons {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  justify-content: center;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
 }
 
 .tab-button {
-  padding: 12px 24px;
-  font-size: 1rem;
+  padding: 1rem 1.5rem;
   border: none;
-  border-radius: 8px;
-  background-color: #2a2a2a;
-  color: #ffffff;
+  background: none;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #6b7280;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
 }
 
 .tab-button:hover {
-  background-color: #3a3a3a;
-  transform: translateY(-1px);
+  color: #111827;
 }
 
 .tab-button.active {
-  background-color: #4a4a4a;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+/* Anki subtabs styling */
+.anki-subtabs {
+  display: flex;
+  background-color: #f3f4f6;
+  padding: 0.5rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.subtab-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+}
+
+.subtab-button:hover {
+  color: #111827;
+  background-color: #e5e7eb;
+}
+
+.subtab-button.active {
+  color: #ffffff;
+  background-color: #2563eb;
 }
 
 .tab-content {
-  background-color: #f5f5f5;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  color: #333;
+  flex: 1;
+  overflow: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tab-button {
+    padding: 1rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .anki-subtabs {
+    padding: 0.5rem 1rem;
+  }
+
+  .subtab-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
 }

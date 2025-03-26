@@ -1,157 +1,145 @@
-# CharaChorder Character Practice - Development Plan
+# CharaChorder Anki Memory System Expansion Plan
 
-## ✅ Completed Features
+## Overview
+This document outlines the plan to expand the CharaChorder practice application by adding chord practice capabilities to the existing Anki memory system.
 
-### Version 1.0 - Sequential Character Practice
-1. Core Functionality
-   - Sequential character mastery mode
-   - 5 consecutive correct hits requirement
-   - Mistake handling and reset
-   - Best streak tracking
-   - Last key pressed feedback
+## Current System
+- The application currently has an AnkiMemorySystem component for practicing individual letters
+- Uses spaced repetition for efficient learning
+- Tracks user progress with a 1-4 rating system
+- Stores progress in localStorage
 
-2. User Interface
-   - Large character display
-   - Visual feedback for attempts
-   - Shake animation for mistakes
-   - Progress indicators
-   - Statistics display
-   - Clean, modern design
+## Expansion Goals ✅
+- Add a new chord practice system
+- Maintain separate progress tracking for letters and chords
+- Keep the familiar Anki-style interface and rating system
+- Optimize the learning experience for chord combinations
 
-### Version 1.5 - Dynamic Practice System
-1. Core Functionality
-   - Dynamic letter set management
-   - Initial set: E, A, R, I, O
-   - Performance-based progression
-   - New letter mastery system (5 successful attempts)
-   - Dynamic review system for struggling letters
-   - Progress persistence with local storage
+## Implementation Phases
 
-2. User Interface
-   - Progress dots for new letters
-   - Active letter set display
-   - Next letters preview
-   - Success/failure indicators
-   - Review mode indicators
-   - Reset functionality
-   - Responsive design
+### Phase 1: Create the Chord Practice Component ✅
 
-3. Statistics Dashboard
-   - Real-time accuracy charts
-   - Attempts per letter visualization
-   - Session performance metrics
-   - Interactive data visualization
-   - Responsive chart layout
+1. **Create a ChordAnkiSystem component**: ✅
+   - Copy and adapt the existing AnkiMemorySystem
+   - Modify it to handle chord data from mostUsedChords.tsx
+   - Update input handling to check if all required letters are pressed
+   - Use a separate localStorage key ("charachorder_anki_chord_system")
 
-4. Tab Navigation
-   - Switch between practice modes
-   - State preservation
-   - Consistent styling
+2. **Create the UI for Chord Practice**: ✅
+   - Display the target word
+   - Show the chord letters required
+   - Add a text input field for user input
+   - Keep the 1-4 rating system
 
-## 🚀 Planned Features
+**Completed Implementation Details:**
+- Created ChordAnkiSystem.tsx component
+- Created ChordAnkiSystem.css for styling
+- Implemented chord-specific input handling
+- Set up spaced repetition system for chord practice
+- Created proper data structures for chord cards
+- Added filtering to exclude empty chords
 
-### Version 1.6 - Learning Aids
-1. Tutorial System
-   - Getting started guide
-   - Best practices
-   - Typing technique tips
-   - Progress milestones
+### Phase 2: Update Tab Navigation ✅
 
-2. Visual Keyboard Reference
-   - CharaChorder layout display
-   - Character position highlighting
-   - Interactive guidance
+1. **Modify PracticeTabs.tsx**: ✅
+   - Add new tabs for Letters and Chords
+   - Restructure to show Practice/View Deck within each category
+   - Update the router/state to handle the new navigation structure
 
-3. Advanced Practice Sets
-   - Common bigrams
-   - Frequency-based words
-   - Custom word lists
-   - Chord combinations
+2. **Update navigation UX**: ✅
+   - Create a consistent navigation path for both systems
+   - Ensure clear visual indication of which system the user is in
 
-### Version 1.7 - User Customization
-1. Settings Interface
-   - Theme customization
-   - Sound feedback options
-   - Visual feedback preferences
-   - Keyboard layout selection
-   - Difficulty adjustments:
-     - Review threshold customization
-     - Required success count
-     - Progression speed
+**Completed Implementation Details:**
+- Updated PracticeTabs.tsx to support main tabs and subtabs
+- Updated PracticeTabs.css with styling for the subtabs
+- Implemented state management for both main tabs and subtabs
+- Created conditional rendering logic for the appropriate component
 
-2. Data Management
-   - Progress export/import
-   - Backup/restore
-   - Practice history
-   - Achievement system
+### Phase 3: Enhance and Polish ✅
 
-### Version 2.0 - Social Features
-1. User Accounts
-   - Progress synchronization
-   - Personal statistics
-   - Achievement tracking
-   - Custom settings sync
+1. **Improve Feedback Mechanisms**: ✅
+   - Adapted practice UI based on CharaChorder workflow
+   - Implemented direct keyboard shortcut rating (1-4 keys)
+   - Designed a practice-focused input field without automated validation
 
-2. Community Features
-   - Leaderboards
-   - Progress sharing
-   - Community challenges
-   - Practice competitions
+2. **UX Improvements**: ✅
+   - Added clear rating instructions
+   - Simplified the practice workflow for CharaChorder users
+   - Updated visual indicators for the rating options
+   - Implemented global keyboard handler for direct rating
 
-3. Multiplayer Mode
-   - Real-time competition
-   - Progress comparison
-   - Friend challenges
-   - Tournament system
+**Refinements to Original Plan:**
+- Modified the workflow to better match actual CharaChorder usage
+- Created a simpler input system that doesn't track correct/incorrect inputs
+- Allowed users to self-report their practice results using number keys
+- Made the rating system more accessible with keyboard shortcuts
 
-### Future Considerations
-1. Performance Optimization
-   - Input latency reduction
-   - Animation optimization
-   - Mobile device support
-   - State management improvements
+## Technical Implementation Details
 
-2. AI Integration
-   - Personalized practice recommendations
-   - Adaptive difficulty algorithms
-   - Learning pattern analysis
-   - Performance predictions
+### Component Structure
+```
+PracticeTabs
+├── Letters
+│   ├── AnkiMemorySystem (existing)
+│   └── (has its own Practice/View Deck tabs)
+└── Chords
+    ├── ChordAnkiSystem (new)
+    └── (has its own Practice/View Deck tabs)
+```
 
-3. Advanced Analytics
-   - Learning curve analysis
-   - Skill progression modeling
-   - Performance benchmarking
-   - Improvement suggestions
+### Data Structure
+1. **ChordCardState**:
+   ```typescript
+   interface ChordCardState {
+     word: string;
+     chord: string[];
+     rank: number;
+     interval: number;
+     nextReviewTime: number;
+     lastReviewed: number;
+     ease: number;
+     totalAttempts: number;
+     correctAttempts: number;
+     state: "new" | "learning" | "review";
+     intervalLevel: number;
+   }
+   ```
 
-## Implementation Schedule
+2. **Chord System State**:
+   ```typescript
+   interface ChordAnkiSystemState {
+     cards: ChordCardState[];
+     activeCard: ChordCardState | null;
+     userInput: string;
+     sessionStats: {
+       totalAttempts: number;
+       correctAttempts: number;
+       cardsReviewed: number;
+     };
+   }
+   ```
 
-### Short Term (1-2 months)
-1. Complete Version 1.6
-   - Tutorial system
-   - Keyboard reference
-   - Basic practice sets
+### User Workflow
+1. User is presented with a word and its chord letters
+2. User practices typing the chord in the input field
+3. When ready, user presses 1-4 to rate their performance
+4. System uses the rating to schedule the next review
+5. System immediately advances to the next due card
 
-2. Begin Version 1.7
-   - Settings interface
-   - Basic customization options
+### Storage
+- Use separate localStorage keys:
+  - "charachorder_anki_system" (existing for letters)
+  - "charachorder_anki_chord_system" (new for chords)
 
-### Medium Term (3-6 months)
-1. Complete Version 1.7
-   - Advanced customization
-   - Data management
-   - Achievement system
+## Success Metrics
+- User can efficiently practice both letters and chords
+- Progress on each system is tracked independently
+- Learning curve is optimized through the spaced repetition system
+- UI provides clear feedback on progress and accuracy
 
-2. Begin Version 2.0
-   - User account system
-   - Basic community features
-
-### Long Term (6+ months)
-1. Complete Version 2.0
-   - Full multiplayer implementation
-   - Advanced community features
-   - Tournament system
-
-2. Future Enhancements
-   - AI integration
-   - Advanced analytics
-   - Mobile optimization 
+## Future Enhancements
+- Add statistics visualization comparing letter vs chord proficiency
+- Allow importing custom chord sets
+- Add settings for adjusting difficulty
+- Create a combined dashboard for overall progress tracking 
