@@ -35,6 +35,12 @@ const DEFAULT_EASE = 2.5;
 // Local storage key
 const STORAGE_KEY = "charachorder_anki_chord_system";
 
+// Number of chords to unlock at a time
+const UNLOCK_BUNDLE_SIZE = 3;
+
+// Number of attempts required before unlocking new chords
+const ATTEMPTS_THRESHOLD = 10;
+
 interface ChordCardState {
   word: string;
   chord: string[];
@@ -47,6 +53,7 @@ interface ChordCardState {
   correctAttempts: number; // Total correct attempts (for accuracy)
   state: CardStateType; // Card state in the learning cycle
   intervalLevel: number; // Current position in the interval progression
+  unlocked: boolean; // Whether the chord is available for learning
 }
 
 interface ChordAnkiSystemState {
@@ -58,10 +65,14 @@ interface ChordAnkiSystemState {
     correctAttempts: number;
     cardsReviewed: number;
   };
+  unlockedCount: number; // Track how many chords are unlocked
 }
 
 // Create a new card based on a chord
-const createCard = (chordData: (typeof mostUsedChords)[0]): ChordCardState => {
+const createCard = (
+  chordData: (typeof mostUsedChords)[0],
+  isUnlocked: boolean
+): ChordCardState => {
   const now = Date.now();
   return {
     word: chordData.word,
@@ -75,6 +86,7 @@ const createCard = (chordData: (typeof mostUsedChords)[0]): ChordCardState => {
     correctAttempts: 0,
     state: "new",
     intervalLevel: 0,
+    unlocked: isUnlocked,
   };
 };
 
@@ -83,21 +95,24 @@ const createInitialState = (): ChordAnkiSystemState => {
   // Only use chords with actual chord data (some entries have empty chord arrays)
   const validChords = mostUsedChords.filter((chord) => chord.chord.length > 0);
 
-  // Create cards for all chords
-  const cards = validChords.map(createCard);
+  // Create cards for all chords, with only the first bundle unlocked
+  const cards = validChords.map((chord, index) =>
+    createCard(chord, index < UNLOCK_BUNDLE_SIZE)
+  );
 
   // Sort initially by rank (highest first) for new cards
   cards.sort((a, b) => a.rank - b.rank);
 
   return {
     cards,
-    activeCard: cards[0], // Start with highest ranked word
+    activeCard: cards.find((card) => card.unlocked) || null, // Start with first unlocked card
     userInput: "",
     sessionStats: {
       totalAttempts: 0,
       correctAttempts: 0,
       cardsReviewed: 0,
     },
+    unlockedCount: UNLOCK_BUNDLE_SIZE,
   };
 };
 
@@ -129,6 +144,57 @@ const formatNextReviewTime = (timestamp: number): string => {
 // Format chord letters for display
 const formatChord = (chord: string[]): string => {
   return chord.map((letter) => letter.toUpperCase()).join(" + ");
+};
+
+// Check if new chords should be unlocked
+const checkUnlockNewChords = (
+  cards: ChordCardState[],
+  unlockedCount: number
+): {
+  shouldUnlock: boolean;
+  newUnlockedCount: number;
+} => {
+  // Get currently unlocked cards
+  const unlockedCards = cards.filter((card) => card.unlocked);
+
+  // Check if all unlocked cards have enough attempts
+  const allUnlockedCardsHaveEnoughAttempts = unlockedCards.every(
+    (card) => card.totalAttempts >= ATTEMPTS_THRESHOLD
+  );
+
+  // If all current cards have enough attempts and there are more cards to unlock
+  if (allUnlockedCardsHaveEnoughAttempts && unlockedCount < cards.length) {
+    const newUnlockedCount = Math.min(
+      unlockedCount + UNLOCK_BUNDLE_SIZE,
+      cards.length
+    );
+    return { shouldUnlock: true, newUnlockedCount };
+  }
+
+  return { shouldUnlock: false, newUnlockedCount: unlockedCount };
+};
+
+const CardProgressBar = ({
+  current,
+  target,
+}: {
+  current: number;
+  target: number;
+}) => {
+  // If current attempts have reached or exceeded the target, don't show the progress bar
+  if (current >= target) {
+    return <span className="progress-complete">✓ Complete</span>;
+  }
+
+  const percentage = Math.min((current / target) * 100, 100);
+  return (
+    <div className="progress-bar-container">
+      <div className="progress-bar-fill" style={{ width: `${percentage}%` }} />
+      <span className="progress-bar-text">
+        {current}/{target}
+      </span>
+    </div>
+  );
 };
 
 export const ChordAnkiSystem = () => {
@@ -181,8 +247,12 @@ export const ChordAnkiSystem = () => {
         const chordData = mostUsedChords.find((c) => c.word === word);
         if (!chordData) return prevState;
 
-        // Create a new card
-        const newCard = createCard(chordData);
+        // Get unlocked status from existing card
+        const existingCard = prevState.cards.find((c) => c.word === word);
+        const isUnlocked = existingCard ? existingCard.unlocked : false;
+
+        // Create a new card while preserving unlocked status
+        const newCard = createCard(chordData, isUnlocked);
 
         // Update the card in the list
         const updatedCards = prevState.cards.map((card) =>
@@ -205,13 +275,42 @@ export const ChordAnkiSystem = () => {
     }
   }, []);
 
+  // Check for new chords to unlock
+  useEffect(() => {
+    const { shouldUnlock, newUnlockedCount } = checkUnlockNewChords(
+      state.cards,
+      state.unlockedCount
+    );
+
+    if (shouldUnlock) {
+      setState((prevState) => {
+        // Create updated cards with new ones unlocked
+        const updatedCards = prevState.cards.map((card, index) => {
+          if (index < newUnlockedCount && !card.unlocked) {
+            return { ...card, unlocked: true };
+          }
+          return card;
+        });
+
+        return {
+          ...prevState,
+          cards: updatedCards,
+          unlockedCount: newUnlockedCount,
+        };
+      });
+    }
+  }, [state.cards, state.unlockedCount]);
+
   // Select the next due card
   const selectNextCard = useCallback(() => {
     setState((prevState) => {
       const now = Date.now();
 
+      // Filter for unlocked cards only
+      const unlockedCards = prevState.cards.filter((card) => card.unlocked);
+
       // Sort cards by due time (earliest first)
-      const sortedCards = [...prevState.cards].sort((a, b) => {
+      const sortedCards = [...unlockedCards].sort((a, b) => {
         // First priority: Due time
         if (a.nextReviewTime !== b.nextReviewTime) {
           return a.nextReviewTime - b.nextReviewTime;
@@ -243,6 +342,12 @@ export const ChordAnkiSystem = () => {
       const now = Date.now();
       let updatedCard: ChordCardState;
 
+      // Update attempts counter
+      const totalAttempts = prevState.activeCard.totalAttempts + 1;
+      // Update correct attempts if rating is good or easy (3 or 4)
+      const correctAttempts =
+        prevState.activeCard.correctAttempts + (rating >= 3 ? 1 : 0);
+
       // Calculate new interval based on rating and card state
       if (rating === 1) {
         // Again - reset to initial interval
@@ -253,6 +358,8 @@ export const ChordAnkiSystem = () => {
           lastReviewed: now,
           state: "learning",
           intervalLevel: 0,
+          totalAttempts,
+          correctAttempts,
         };
       } else {
         // For Hard, Good and Easy ratings
@@ -326,6 +433,8 @@ export const ChordAnkiSystem = () => {
           ease: newEase,
           state: newState,
           intervalLevel: newIntervalLevel,
+          totalAttempts,
+          correctAttempts,
         };
       }
 
@@ -337,11 +446,15 @@ export const ChordAnkiSystem = () => {
       // Update session stats
       const updatedSessionStats = {
         ...prevState.sessionStats,
+        totalAttempts: prevState.sessionStats.totalAttempts + 1,
+        correctAttempts:
+          prevState.sessionStats.correctAttempts + (rating >= 3 ? 1 : 0),
         cardsReviewed: prevState.sessionStats.cardsReviewed + 1,
       };
 
-      // Find the next card to show
-      const sortedCards = [...updatedCards].sort((a, b) => {
+      // Find the next card to show (only from unlocked cards)
+      const unlockedCards = updatedCards.filter((card) => card.unlocked);
+      const sortedCards = [...unlockedCards].sort((a, b) => {
         if (a.nextReviewTime !== b.nextReviewTime) {
           return a.nextReviewTime - b.nextReviewTime;
         }
@@ -406,12 +519,18 @@ export const ChordAnkiSystem = () => {
 
   // Calculate stats for display
   const stats = {
-    dueCount: state.cards.filter((card) => card.nextReviewTime <= Date.now())
-      .length,
-    newCount: state.cards.filter((card) => card.state === "new").length,
-    learningCount: state.cards.filter((card) => card.state === "learning")
-      .length,
-    reviewCount: state.cards.filter((card) => card.state === "review").length,
+    dueCount: state.cards.filter(
+      (card) => card.unlocked && card.nextReviewTime <= Date.now()
+    ).length,
+    newCount: state.cards.filter(
+      (card) => card.unlocked && card.state === "new"
+    ).length,
+    learningCount: state.cards.filter(
+      (card) => card.unlocked && card.state === "learning"
+    ).length,
+    reviewCount: state.cards.filter(
+      (card) => card.unlocked && card.state === "review"
+    ).length,
     accuracy:
       state.sessionStats.totalAttempts > 0
         ? Math.round(
@@ -420,6 +539,8 @@ export const ChordAnkiSystem = () => {
               100
           )
         : 0,
+    unlockedCount: state.unlockedCount,
+    totalCount: state.cards.length,
   };
 
   return (
@@ -444,12 +565,29 @@ export const ChordAnkiSystem = () => {
           <div className="progress-indicator">
             {formatNextReviewTime(state.activeCard.nextReviewTime)}
             <div>Card Status: {state.activeCard.state}</div>
+            <div>
+              Progress: {stats.unlockedCount} of {stats.totalCount} chords
+              unlocked
+            </div>
           </div>
 
           <div className="word-display">
             <div className="word">{state.activeCard.word}</div>
             <div className="chord-letters">
               Chord: {formatChord(state.activeCard.chord)}
+            </div>
+            <div className="attempts-progress">
+              <span>Attempts progress: </span>
+              {state.activeCard.totalAttempts >= ATTEMPTS_THRESHOLD ? (
+                <span className="progress-complete">
+                  ✓ Practice goal reached!
+                </span>
+              ) : (
+                <CardProgressBar
+                  current={state.activeCard.totalAttempts}
+                  target={ATTEMPTS_THRESHOLD}
+                />
+              )}
             </div>
           </div>
 
@@ -505,9 +643,39 @@ export const ChordAnkiSystem = () => {
                 <div className="stat-label">Cards Reviewed</div>
               </div>
               <div className="stat-item">
-                <div className="stat-value">{stats.reviewCount}</div>
-                <div className="stat-label">Mastered Chords</div>
+                <div className="stat-value">{stats.unlockedCount}</div>
+                <div className="stat-label">Unlocked Chords</div>
               </div>
+            </div>
+
+            <div className="unlock-progress">
+              <h4>Progress toward next unlock:</h4>
+              <div className="unlock-cards-container">
+                {state.cards
+                  .filter(
+                    (card) =>
+                      card.unlocked && card.totalAttempts < ATTEMPTS_THRESHOLD
+                  )
+                  .sort((a, b) => a.rank - b.rank)
+                  .map((card) => (
+                    <div key={card.word} className="unlock-card-progress">
+                      <div className="unlock-card-word">{card.word}</div>
+                      <CardProgressBar
+                        current={card.totalAttempts}
+                        target={ATTEMPTS_THRESHOLD}
+                      />
+                    </div>
+                  ))}
+              </div>
+              {state.cards.filter(
+                (card) =>
+                  card.unlocked && card.totalAttempts < ATTEMPTS_THRESHOLD
+              ).length === 0 && (
+                <div className="all-complete-message">
+                  All current chords have reached the practice goal! New chords
+                  will unlock soon.
+                </div>
+              )}
             </div>
           </div>
 
@@ -525,12 +693,13 @@ export const ChordAnkiSystem = () => {
                 <th>Word</th>
                 <th>Chord</th>
                 <th>Next Review</th>
-                <th>Accuracy</th>
+                <th>Status</th>
+                <th>Attempts</th>
               </tr>
             </thead>
             <tbody>
               {[...state.cards]
-                .sort((a, b) => a.nextReviewTime - b.nextReviewTime)
+                .sort((a, b) => a.rank - b.rank)
                 .map((card) => (
                   <tr
                     key={card.word}
@@ -539,32 +708,59 @@ export const ChordAnkiSystem = () => {
                         selectedCard?.word === card.word ? null : card
                       )
                     }
-                    className={
-                      selectedCard?.word === card.word ? "selected" : ""
-                    }
+                    className={`
+                      ${selectedCard?.word === card.word ? "selected" : ""}
+                      ${!card.unlocked ? "locked-card" : ""}
+                    `}
                   >
                     <td className="word-cell">{card.word}</td>
-                    <td className="chord-cell">{formatChord(card.chord)}</td>
-                    <td>{formatNextReviewTime(card.nextReviewTime)}</td>
+                    <td className="chord-cell">
+                      {card.unlocked ? formatChord(card.chord) : "🔒"}
+                    </td>
                     <td>
-                      {card.totalAttempts > 0
-                        ? Math.round(
-                            (card.correctAttempts / card.totalAttempts) * 100
-                          )
-                        : 0}
-                      %
+                      {card.unlocked
+                        ? formatNextReviewTime(card.nextReviewTime)
+                        : "Locked"}
+                    </td>
+                    <td>{card.unlocked ? card.state : "Locked"}</td>
+                    <td>
+                      {card.unlocked ? (
+                        card.totalAttempts >= ATTEMPTS_THRESHOLD ? (
+                          <span className="progress-complete">✓ Complete</span>
+                        ) : (
+                          <CardProgressBar
+                            current={card.totalAttempts}
+                            target={ATTEMPTS_THRESHOLD}
+                          />
+                        )
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))}
             </tbody>
           </table>
 
+          <div className="unlocking-explanation">
+            <p>
+              New chords are unlocked in groups of {UNLOCK_BUNDLE_SIZE} when all
+              currently unlocked chords have at least {ATTEMPTS_THRESHOLD}{" "}
+              practice attempts.
+            </p>
+            <p>
+              Current progress: {stats.unlockedCount} of {stats.totalCount}{" "}
+              chords unlocked
+            </p>
+          </div>
+
           {selectedCard && (
             <div className="card-details">
               <h3>Details for Word: {selectedCard.word}</h3>
               <div className="details-grid">
                 <div>
-                  <strong>Status:</strong> {selectedCard.state}
+                  <strong>Status:</strong>{" "}
+                  {selectedCard.unlocked ? selectedCard.state : "Locked"}
                 </div>
                 <div>
                   <strong>Chord:</strong> {formatChord(selectedCard.chord)}
@@ -608,15 +804,17 @@ export const ChordAnkiSystem = () => {
                   %
                 </div>
               </div>
-              <button
-                className="reset-card-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleResetCard(selectedCard.word);
-                }}
-              >
-                Reset Progress for this Word
-              </button>
+              {selectedCard.unlocked && (
+                <button
+                  className="reset-card-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetCard(selectedCard.word);
+                  }}
+                >
+                  Reset Progress for this Word
+                </button>
+              )}
             </div>
           )}
         </div>

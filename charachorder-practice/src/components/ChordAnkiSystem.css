@@ -324,3 +324,116 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Progress bar styles */
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  margin: 5px 0;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+}
+
+.progress-bar-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-weight: 600;
+  text-shadow: 0 0 2px #fff;
+}
+
+/* Attempts progress in word display */
+.attempts-progress {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.attempts-progress span {
+  margin-bottom: 5px;
+}
+
+/* Unlock progress section */
+.unlock-progress {
+  margin-top: 20px;
+  border-top: 1px solid #ddd;
+  padding-top: 15px;
+}
+
+.unlock-progress h4 {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.unlock-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.unlock-card-progress {
+  background-color: #f5f5f5;
+  border-radius: 5px;
+  padding: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.unlock-card-word {
+  font-weight: 600;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+/* Table improvements for progress bars */
+.deck-table td {
+  padding: 8px 12px;
+  vertical-align: middle;
+}
+
+.locked-card {
+  opacity: 0.6;
+  background-color: #f8f8f8;
+}
+
+/* Progress bar in table - make it more compact */
+.deck-table .progress-bar-container {
+  height: 16px;
+  width: 120px;
+}
+
+/* Progress completion indicator */
+.progress-complete {
+  color: #10b981;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.all-complete-message {
+  text-align: center;
+  padding: 15px;
+  background-color: #ecfdf5;
+  border-radius: 8px;
+  color: #10b981;
+  margin-top: 10px;
+  font-weight: 500;
+}
