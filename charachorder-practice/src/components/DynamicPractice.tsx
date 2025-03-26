@@ -354,10 +354,10 @@ const updateLetterProgress = (
     confusedWith[pressedKey] = (confusedWith[pressedKey] || 0) + 1;
   }
 
-  // Update successful attempts count if correct
+  // Update successful attempts count - reset to 0 if incorrect (need consecutive correct attempts)
   let newSuccessfulAttemptsCount = isCorrect
     ? letter.successfulAttemptsCount + 1
-    : letter.successfulAttemptsCount; // Don't reset on incorrect - keep count
+    : 0; // Reset on incorrect to require consecutive correct attempts
 
   // Check if letter needs review (3 or more mistakes in last 5 attempts)
   const recentAttempts = newAttempts.slice(-5);
