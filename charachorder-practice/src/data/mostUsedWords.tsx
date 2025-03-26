@@ -1,6 +1,7 @@
 interface WordFrequency {
   word: string;
   rank: number;
+  frequency?: number;
 }
 
 export const mostUsedWords: WordFrequency[] = [
