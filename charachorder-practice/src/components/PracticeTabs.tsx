@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { CharacterPractice } from "./CharacterPractice";
 import { DynamicPractice } from "./DynamicPractice";
+import { AnkiMemorySystem } from "./AnkiMemorySystem";
 import "./PracticeTabs.css";
 
 export const PracticeTabs = () => {
-  const [activeTab, setActiveTab] = useState<"sequential" | "dynamic">(
-    "sequential"
+  const [activeTab, setActiveTab] = useState<"sequential" | "dynamic" | "anki">(
+    "anki"
   );
 
   return (
@@ -23,12 +24,20 @@ export const PracticeTabs = () => {
         >
           Dynamic Practice
         </button>
+        <button
+          className={`tab-button ${activeTab === "anki" ? "active" : ""}`}
+          onClick={() => setActiveTab("anki")}
+        >
+          Anki Memory
+        </button>
       </div>
       <div className="tab-content">
         {activeTab === "sequential" ? (
           <CharacterPractice />
-        ) : (
+        ) : activeTab === "dynamic" ? (
           <DynamicPractice />
+        ) : (
+          <AnkiMemorySystem />
         )}
       </div>
     </div>
