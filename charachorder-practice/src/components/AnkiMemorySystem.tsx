@@ -558,28 +558,28 @@ export const AnkiMemorySystem = () => {
             <div className="rating-buttons">
               <button
                 className="rating-button again"
-                onClick={() => handleRating(1 as 1 | 2 | 3 | 4)}
+                onClick={() => handleRating(1)}
               >
                 Again
                 <span className="shortcut">1</span>
               </button>
               <button
                 className="rating-button hard"
-                onClick={() => handleRating(2 as 1 | 2 | 3 | 4)}
+                onClick={() => handleRating(2)}
               >
                 Hard
                 <span className="shortcut">2</span>
               </button>
               <button
                 className="rating-button good"
-                onClick={() => handleRating(3 as 1 | 2 | 3 | 4)}
+                onClick={() => handleRating(3)}
               >
                 Good
                 <span className="shortcut">3</span>
               </button>
               <button
                 className="rating-button easy"
-                onClick={() => handleRating(4 as 1 | 2 | 3 | 4)}
+                onClick={() => handleRating(4)}
               >
                 Easy
                 <span className="shortcut">4</span>
