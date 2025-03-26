@@ -413,14 +413,14 @@ export const AnkiMemorySystem = () => {
           // Adjust ease factor based on rating (only in review phase)
           let newEase = prevState.activeCard.ease;
           if (prevState.activeCard.state === "review") {
-            newEase +=
-              rating === 1
-                ? -0.2 // Again
-                : rating === 2
-                ? -0.15 // Hard
-                : rating === 3
-                ? 0 // Good
-                : 0.15; // Easy
+            // For ratings 2, 3, 4 (since we're in the else block)
+            const easeAdjustments = {
+              2: -0.15, // Hard
+              3: 0, // Good
+              4: 0.15, // Easy
+            };
+
+            newEase += easeAdjustments[rating as 2 | 3 | 4];
 
             // Ensure ease doesn't go below 1.3
             newEase = Math.max(1.3, newEase);
