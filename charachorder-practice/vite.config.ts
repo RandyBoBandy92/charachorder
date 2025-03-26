@@ -7,5 +7,5 @@ export default defineConfig({
   css: {
     devSourcemap: true,
   },
-  base: "/charachorder-practice/",
+  base: "/charachorder/",
 });
