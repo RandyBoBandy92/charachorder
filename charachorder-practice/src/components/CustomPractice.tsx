@@ -8,6 +8,7 @@ export const CustomPractice = () => {
   const [showModal, setShowModal] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isShuffled, setIsShuffled] = useState(false);
+  const [isInterleaved, setIsInterleaved] = useState(false);
   const [practiceActive, setPracticeActive] = useState(false);
   const [completedCycles, setCompletedCycles] = useState(0);
   const [showCycleNotification, setShowCycleNotification] = useState(false);
@@ -24,18 +25,52 @@ export const CustomPractice = () => {
       .split(/\s+/)
       .filter((unit) => unit);
 
-    if (isShuffled) {
-      // Fisher-Yates shuffle algorithm
-      for (let i = processedUnits.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [processedUnits[i], processedUnits[j]] = [
-          processedUnits[j],
-          processedUnits[i],
-        ];
+    let finalUnits = [...processedUnits];
+
+    // Apply interleaving if enabled (each unit appears 3 times interleaved)
+    if (isInterleaved && processedUnits.length > 1) {
+      // Create a pattern where each unit appears 3 times,
+      // interleaved with other units to create contextual switching
+      finalUnits = [];
+
+      // For each unit, we'll add it 3 times with other units in between
+      for (let i = 0; i < processedUnits.length; i++) {
+        // Get the current unit
+        const current = processedUnits[i];
+
+        // Get neighboring units (with wraparound)
+        const next =
+          i < processedUnits.length - 1
+            ? processedUnits[i + 1]
+            : processedUnits[0];
+
+        // First occurrence of current unit
+        finalUnits.push(current);
+
+        // Add next unit as interleaving
+        finalUnits.push(next);
+
+        // Second occurrence of current unit
+        finalUnits.push(current);
+
+        // Add next unit again for more interleaving
+        finalUnits.push(next);
+
+        // Third occurrence of current unit
+        finalUnits.push(current);
       }
     }
 
-    setUnits(processedUnits);
+    // Apply shuffle if enabled (after interleaving)
+    if (isShuffled) {
+      // Fisher-Yates shuffle algorithm
+      for (let i = finalUnits.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [finalUnits[i], finalUnits[j]] = [finalUnits[j], finalUnits[i]];
+      }
+    }
+
+    setUnits(finalUnits);
     setCurrentUnitIndex(0);
     setUserInput("");
     setPracticeActive(true);
@@ -113,6 +148,14 @@ export const CustomPractice = () => {
                 onChange={() => setIsShuffled(!isShuffled)}
               />
               Shuffle Units
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={isInterleaved}
+                onChange={() => setIsInterleaved(!isInterleaved)}
+              />
+              Interleave Units
             </label>
           </div>
         </div>
