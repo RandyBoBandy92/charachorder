@@ -197,6 +197,14 @@ export const CustomPractice = () => {
     }
   };
 
+  // Handle key press in the input field
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Clear input when ESC key is pressed
+    if (e.key === "Escape") {
+      setUserInput("");
+    }
+  };
+
   // Reset practice
   const resetPractice = () => {
     setUnits([]);
@@ -247,7 +255,8 @@ export const CustomPractice = () => {
               type="text"
               value={userInput}
               onChange={handleInputChange}
-              placeholder="Type the unit shown above..."
+              onKeyDown={handleInputKeyDown}
+              placeholder="Type the unit shown above... (Press ESC to clear)"
               autoFocus
             />
           </div>
