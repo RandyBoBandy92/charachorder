@@ -1,23 +1,66 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./PracticeTabs.css"; // Reusing existing styles
 
+// Type for history entry
+interface HistoryEntry {
+  text: string;
+  date: string;
+}
+
 export const CustomPractice = () => {
   const [inputText, setInputText] = useState("");
   const [units, setUnits] = useState<string[]>([]);
   const [currentUnitIndex, setCurrentUnitIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isShuffled, setIsShuffled] = useState(false);
   const [isInterleaved, setIsInterleaved] = useState(false);
   const [practiceActive, setPracticeActive] = useState(false);
   const [completedCycles, setCompletedCycles] = useState(0);
   const [showCycleNotification, setShowCycleNotification] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load history from localStorage on component mount
+  useEffect(() => {
+    const storedHistory = localStorage.getItem("customPracticeHistory");
+    if (storedHistory) {
+      try {
+        setHistory(JSON.parse(storedHistory));
+      } catch (e) {
+        console.error("Failed to parse history from localStorage", e);
+        // Reset history if parsing fails
+        localStorage.removeItem("customPracticeHistory");
+      }
+    }
+  }, []);
+
+  // Save a new entry to history
+  const addToHistory = (text: string) => {
+    const newEntry: HistoryEntry = {
+      text,
+      date: new Date().toLocaleString(),
+    };
+
+    // Add new entry to beginning, limit to 10 items
+    const updatedHistory = [newEntry, ...history].slice(0, 10);
+    setHistory(updatedHistory);
+
+    // Save to localStorage
+    localStorage.setItem(
+      "customPracticeHistory",
+      JSON.stringify(updatedHistory)
+    );
+  };
 
   // Process text into units (words or letters) when submitted
   const processText = () => {
     if (!inputText.trim()) return;
+
+    // Add to history
+    addToHistory(inputText);
 
     // Split by whitespace and filter out empty strings
     const processedUnits = inputText
@@ -82,13 +125,24 @@ export const CustomPractice = () => {
     }, 100);
   };
 
+  // Apply a history entry
+  const applyHistoryEntry = (entry: HistoryEntry) => {
+    setInputText(entry.text);
+    setShowHistoryModal(false);
+    setShowModal(true);
+  };
+
   // Handle user input
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setUserInput(value);
 
     // Check if the input matches the current unit
-    if (value === units[currentUnitIndex]) {
+    // Accept both exact match and match with trailing space (for chorded input)
+    if (
+      value === units[currentUnitIndex] ||
+      value === `${units[currentUnitIndex]} `
+    ) {
       // Move to next unit or loop back to the beginning
       if (currentUnitIndex < units.length - 1) {
         setCurrentUnitIndex((prev) => prev + 1);
@@ -139,25 +193,6 @@ export const CustomPractice = () => {
           <button onClick={openInputModal} className="primary-button">
             Add Custom Text
           </button>
-
-          <div className="practice-options">
-            <label>
-              <input
-                type="checkbox"
-                checked={isShuffled}
-                onChange={() => setIsShuffled(!isShuffled)}
-              />
-              Shuffle Units
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={isInterleaved}
-                onChange={() => setIsInterleaved(!isInterleaved)}
-              />
-              Interleave Units
-            </label>
-          </div>
         </div>
       )}
 
@@ -211,6 +246,16 @@ export const CustomPractice = () => {
         </div>
       )}
 
+      {/* Bottom buttons - always visible */}
+      <div className="bottom-buttons">
+        <button
+          onClick={() => setShowHistoryModal(true)}
+          className="secondary-button"
+        >
+          History
+        </button>
+      </div>
+
       {/* Modal for text input */}
       {showModal && (
         <div className="modal-overlay">
@@ -224,6 +269,26 @@ export const CustomPractice = () => {
               rows={5}
               autoFocus
             />
+
+            <div className="modal-options">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isShuffled}
+                  onChange={() => setIsShuffled(!isShuffled)}
+                />
+                Shuffle Units
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={isInterleaved}
+                  onChange={() => setIsInterleaved(!isInterleaved)}
+                />
+                Interleave Units
+              </label>
+            </div>
+
             <div className="modal-buttons">
               <button
                 onClick={() => setShowModal(false)}
@@ -233,6 +298,46 @@ export const CustomPractice = () => {
               </button>
               <button onClick={processText} className="primary-button">
                 Start Practice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistoryModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Practice History</h3>
+            <p>Click an entry to use it again:</p>
+
+            <div className="history-entries">
+              {history.length > 0 ? (
+                history.map((entry, index) => (
+                  <div
+                    key={index}
+                    className="history-entry"
+                    onClick={() => applyHistoryEntry(entry)}
+                  >
+                    <div className="history-text">
+                      {entry.text.length > 50
+                        ? `${entry.text.substring(0, 50)}...`
+                        : entry.text}
+                    </div>
+                    <div className="history-date">{entry.date}</div>
+                  </div>
+                ))
+              ) : (
+                <p className="no-history">No history entries yet</p>
+              )}
+            </div>
+
+            <div className="modal-buttons">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="secondary-button"
+              >
+                Close
               </button>
             </div>
           </div>
