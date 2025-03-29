@@ -212,12 +212,12 @@ export const CustomPractice = () => {
       originalValue === `${currentUnit} ` ||
       originalValue === currentUnit
     ) {
-      advanceToNextUnit();
+      advanceToNextUnit(trimmedValue.length);
     }
   };
 
   // Advance to the next unit
-  const advanceToNextUnit = () => {
+  const advanceToNextUnit = (numberOfCharactersInCurrentTextInput: number) => {
     debugger;
     // Also clear any pending debounce timer
     if (inputDebounceTimerRef.current) {
@@ -242,10 +242,11 @@ export const CustomPractice = () => {
 
     // Wait a short time before clearing the input field
     // This gives CharaChorder time to finish its input process
+    const tenMsPerCharacter = numberOfCharactersInCurrentTextInput * 10;
     setTimeout(() => {
       debugger;
       setUserInput("");
-    }, 50);
+    }, tenMsPerCharacter);
   };
 
   // Handle key press in the input field
