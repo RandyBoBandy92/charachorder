@@ -110,43 +110,43 @@ export const CustomPractice = () => {
 
     let finalUnits = [...processedUnits];
 
-    // Apply interleaving if enabled (each unit appears interleaveCount times interleaved)
-    if (isInterleaved && processedUnits.length > 1) {
-      // Create a pattern where each unit appears the specified number of times,
-      // interleaved with other units to create contextual switching
-      finalUnits = [];
-
-      // For each unit, add it interleaveCount times with other units in between
-      for (let i = 0; i < processedUnits.length; i++) {
-        // Get the current unit
-        const current = processedUnits[i];
-
-        // Get neighboring units (with wraparound)
-        const next =
-          i < processedUnits.length - 1
-            ? processedUnits[i + 1]
-            : processedUnits[0];
-
-        // Add current unit and interleave with next unit
-        for (let rep = 0; rep < interleaveCount; rep++) {
-          // Add current unit
-          finalUnits.push(current);
-
-          // Add next unit for interleaving (except after the last repetition)
-          if (rep < interleaveCount - 1) {
-            finalUnits.push(next);
-          }
-        }
-      }
-    }
-
-    // Apply shuffle if enabled (after interleaving)
+    // Apply shuffle first if enabled
     if (isShuffled) {
       // Fisher-Yates shuffle algorithm
       for (let i = finalUnits.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [finalUnits[i], finalUnits[j]] = [finalUnits[j], finalUnits[i]];
       }
+    }
+
+    // Then apply interleaving if enabled (using the potentially shuffled units)
+    if (isInterleaved && finalUnits.length > 1) {
+      // Create a pattern where each unit appears the specified number of times,
+      // interleaved with other units to create contextual switching
+      const interleavedUnits = [];
+
+      // For each unit, add it interleaveCount times with other units in between
+      for (let i = 0; i < finalUnits.length; i++) {
+        // Get the current unit
+        const current = finalUnits[i];
+
+        // Get neighboring units (with wraparound)
+        const next =
+          i < finalUnits.length - 1 ? finalUnits[i + 1] : finalUnits[0];
+
+        // Add current unit and interleave with next unit
+        for (let rep = 0; rep < interleaveCount; rep++) {
+          // Add current unit
+          interleavedUnits.push(current);
+
+          // Add next unit for interleaving (except after the last repetition)
+          if (rep < interleaveCount - 1) {
+            interleavedUnits.push(next);
+          }
+        }
+      }
+
+      finalUnits = interleavedUnits;
     }
 
     setUnits(finalUnits);
@@ -218,7 +218,6 @@ export const CustomPractice = () => {
 
   // Advance to the next unit
   const advanceToNextUnit = (numberOfCharactersInCurrentTextInput: number) => {
-    debugger;
     // Also clear any pending debounce timer
     if (inputDebounceTimerRef.current) {
       clearTimeout(inputDebounceTimerRef.current);
@@ -244,7 +243,6 @@ export const CustomPractice = () => {
     // This gives CharaChorder time to finish its input process
     const tenMsPerCharacter = numberOfCharactersInCurrentTextInput * 10;
     setTimeout(() => {
-      debugger;
       setUserInput("");
     }, tenMsPerCharacter);
   };
