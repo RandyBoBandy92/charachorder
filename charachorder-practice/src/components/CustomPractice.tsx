@@ -16,6 +16,8 @@ export const CustomPractice = () => {
   const [userInput, setUserInput] = useState("");
   const [isShuffled, setIsShuffled] = useState(false);
   const [isInterleaved, setIsInterleaved] = useState(false);
+  const [interleaveCount, setInterleaveCount] = useState(3); // Default: 3 repetitions
+  const [interleaveInputValue, setInterleaveInputValue] = useState("3"); // Input field value
   const [practiceActive, setPracticeActive] = useState(false);
   const [completedCycles, setCompletedCycles] = useState(0);
   const [showCycleNotification, setShowCycleNotification] = useState(false);
@@ -36,6 +38,37 @@ export const CustomPractice = () => {
       }
     }
   }, []);
+
+  // Handle interleave count change with validation
+  const handleInterleaveCountChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const inputValue = e.target.value;
+
+    // Always update the input field value
+    setInterleaveInputValue(inputValue);
+
+    // Handle empty input (for when users are backspacing)
+    if (inputValue === "") {
+      return;
+    }
+
+    const numValue = parseInt(inputValue);
+
+    // Update actual interleave count only when we have a valid number
+    if (!isNaN(numValue)) {
+      // Clamp the value between 1 and 10
+      const clampedValue = Math.min(10, Math.max(1, numValue));
+      setInterleaveCount(clampedValue);
+    }
+  };
+
+  // When modal opens, sync the interleaveInputValue with interleaveCount
+  useEffect(() => {
+    if (showModal) {
+      setInterleaveInputValue(interleaveCount.toString());
+    }
+  }, [showModal, interleaveCount]);
 
   // Save a new entry to history
   const addToHistory = (text: string) => {
@@ -59,6 +92,12 @@ export const CustomPractice = () => {
   const processText = () => {
     if (!inputText.trim()) return;
 
+    // Ensure we have a valid interleave count before starting
+    if (interleaveInputValue === "" || isNaN(parseInt(interleaveInputValue))) {
+      setInterleaveCount(3); // Reset to default if invalid
+      setInterleaveInputValue("3");
+    }
+
     // Add to history
     addToHistory(inputText);
 
@@ -70,13 +109,13 @@ export const CustomPractice = () => {
 
     let finalUnits = [...processedUnits];
 
-    // Apply interleaving if enabled (each unit appears 3 times interleaved)
+    // Apply interleaving if enabled (each unit appears interleaveCount times interleaved)
     if (isInterleaved && processedUnits.length > 1) {
-      // Create a pattern where each unit appears 3 times,
+      // Create a pattern where each unit appears the specified number of times,
       // interleaved with other units to create contextual switching
       finalUnits = [];
 
-      // For each unit, we'll add it 3 times with other units in between
+      // For each unit, add it interleaveCount times with other units in between
       for (let i = 0; i < processedUnits.length; i++) {
         // Get the current unit
         const current = processedUnits[i];
@@ -87,20 +126,16 @@ export const CustomPractice = () => {
             ? processedUnits[i + 1]
             : processedUnits[0];
 
-        // First occurrence of current unit
-        finalUnits.push(current);
+        // Add current unit and interleave with next unit
+        for (let rep = 0; rep < interleaveCount; rep++) {
+          // Add current unit
+          finalUnits.push(current);
 
-        // Add next unit as interleaving
-        finalUnits.push(next);
-
-        // Second occurrence of current unit
-        finalUnits.push(current);
-
-        // Add next unit again for more interleaving
-        finalUnits.push(next);
-
-        // Third occurrence of current unit
-        finalUnits.push(current);
+          // Add next unit for interleaving (except after the last repetition)
+          if (rep < interleaveCount - 1) {
+            finalUnits.push(next);
+          }
+        }
       }
     }
 
@@ -279,14 +314,41 @@ export const CustomPractice = () => {
                 />
                 Shuffle Units
               </label>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={isInterleaved}
-                  onChange={() => setIsInterleaved(!isInterleaved)}
-                />
-                Interleave Units
-              </label>
+              <div className="interleave-option">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isInterleaved}
+                    onChange={() => setIsInterleaved(!isInterleaved)}
+                  />
+                  Interleave Units
+                </label>
+                {isInterleaved && (
+                  <div className="interleave-count">
+                    <label htmlFor="interleave-count">Repetitions:</label>
+                    <input
+                      id="interleave-count"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={interleaveInputValue}
+                      onChange={handleInterleaveCountChange}
+                      onBlur={() => {
+                        // When focus leaves the input, ensure we have a valid value
+                        if (
+                          interleaveInputValue === "" ||
+                          isNaN(parseInt(interleaveInputValue))
+                        ) {
+                          setInterleaveInputValue(interleaveCount.toString());
+                        } else {
+                          // Make sure the displayed value matches the actual count
+                          setInterleaveInputValue(interleaveCount.toString());
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="modal-buttons">
