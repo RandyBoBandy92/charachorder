@@ -24,6 +24,7 @@ export const CustomPractice = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputDebounceTimerRef = useRef<number | null>(null);
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -167,34 +168,84 @@ export const CustomPractice = () => {
     setShowModal(true);
   };
 
-  // Handle user input
+  // Handle user input with debouncing and trimming
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setUserInput(value);
 
-    // Check if the input matches the current unit
-    // Accept both exact match and match with trailing space (for chorded input)
-    if (
-      value === units[currentUnitIndex] ||
-      value === `${units[currentUnitIndex]} `
-    ) {
-      // Move to next unit or loop back to the beginning
-      if (currentUnitIndex < units.length - 1) {
-        setCurrentUnitIndex((prev) => prev + 1);
-        setUserInput("");
-      } else {
-        // Loop back to the first unit
-        setCurrentUnitIndex(0);
-        setUserInput("");
-        setCompletedCycles((prev) => prev + 1);
+    // // Do an immediate check for exact matches or matches with trailing space
+    // // This helps catch chorded inputs right away
+    // const currentUnit = units[currentUnitIndex];
+    // if (value === currentUnit || value === `${currentUnit} `) {
+    //   advanceToNextUnit();
+    //   return; // Skip debouncing if we already matched
+    // }
 
-        // Show cycle completion notification
-        setShowCycleNotification(true);
-        setTimeout(() => {
-          setShowCycleNotification(false);
-        }, 1500);
-      }
+    // For other cases, use debouncing to handle complex scenarios
+    // Clear any existing debounce timer
+    if (inputDebounceTimerRef.current) {
+      clearTimeout(inputDebounceTimerRef.current);
     }
+
+    // Set a new debounce timer (100ms delay)
+    inputDebounceTimerRef.current = setTimeout(() => {
+      // Trim the input value to handle leading/trailing whitespace
+      const trimmedValue = value.trim();
+
+      // Only check match if we have input after trimming
+      if (trimmedValue) {
+        checkForMatch(trimmedValue, value);
+      }
+    }, 100);
+  };
+
+  // Check if input matches current unit
+  const checkForMatch = (trimmedValue: string, originalValue: string) => {
+    const currentUnit = units[currentUnitIndex];
+
+    // Match conditions:
+    // 1. Trimmed input matches exactly (handles leading/trailing spaces)
+    // 2. Original input with a trailing space (for chorded input)
+    // 3. Original input itself (direct match)
+    if (
+      trimmedValue === currentUnit ||
+      originalValue === `${currentUnit} ` ||
+      originalValue === currentUnit
+    ) {
+      advanceToNextUnit();
+    }
+  };
+
+  // Advance to the next unit
+  const advanceToNextUnit = () => {
+    debugger;
+    // Also clear any pending debounce timer
+    if (inputDebounceTimerRef.current) {
+      clearTimeout(inputDebounceTimerRef.current);
+      inputDebounceTimerRef.current = null;
+    }
+
+    // Move to next unit or loop back to the beginning
+    if (currentUnitIndex < units.length - 1) {
+      setCurrentUnitIndex((prev) => prev + 1);
+    } else {
+      // Loop back to the first unit
+      setCurrentUnitIndex(0);
+      setCompletedCycles((prev) => prev + 1);
+
+      // Show cycle completion notification
+      setShowCycleNotification(true);
+      setTimeout(() => {
+        setShowCycleNotification(false);
+      }, 1500);
+    }
+
+    // Wait a short time before clearing the input field
+    // This gives CharaChorder time to finish its input process
+    setTimeout(() => {
+      debugger;
+      setUserInput("");
+    }, 50);
   };
 
   // Handle key press in the input field
@@ -202,8 +253,23 @@ export const CustomPractice = () => {
     // Clear input when ESC key is pressed
     if (e.key === "Escape") {
       setUserInput("");
+
+      // Also clear any pending debounce timer
+      if (inputDebounceTimerRef.current) {
+        clearTimeout(inputDebounceTimerRef.current);
+        inputDebounceTimerRef.current = null;
+      }
     }
   };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (inputDebounceTimerRef.current) {
+        clearTimeout(inputDebounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Reset practice
   const resetPractice = () => {
