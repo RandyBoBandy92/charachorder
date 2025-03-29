@@ -3,16 +3,17 @@ import { CharacterPractice } from "./CharacterPractice";
 import { DynamicPractice } from "./DynamicPractice";
 import { AnkiMemorySystem } from "./AnkiMemorySystem";
 import { ChordAnkiSystem } from "./ChordAnkiSystem";
+import { CustomPractice } from "./CustomPractice";
 import "./PracticeTabs.css";
 
 // Define the main practice types
-type PracticeType = "sequential" | "dynamic" | "anki";
+type PracticeType = "sequential" | "dynamic" | "anki" | "custom";
 
 // Define the anki practice subtypes
 type AnkiSubType = "letters" | "chords";
 
 export const PracticeTabs = () => {
-  // Main practice type (sequential, dynamic, anki)
+  // Main practice type (sequential, dynamic, anki, custom)
   const [activeTab, setActiveTab] = useState<PracticeType>("anki");
 
   // Anki subtype (letters or chords)
@@ -39,6 +40,12 @@ export const PracticeTabs = () => {
           onClick={() => setActiveTab("anki")}
         >
           Anki Memory
+        </button>
+        <button
+          className={`tab-button ${activeTab === "custom" ? "active" : ""}`}
+          onClick={() => setActiveTab("custom")}
+        >
+          Custom Practice
         </button>
       </div>
 
@@ -70,6 +77,8 @@ export const PracticeTabs = () => {
           <CharacterPractice />
         ) : activeTab === "dynamic" ? (
           <DynamicPractice />
+        ) : activeTab === "custom" ? (
+          <CustomPractice />
         ) : ankiSubType === "letters" ? (
           <AnkiMemorySystem />
         ) : (
