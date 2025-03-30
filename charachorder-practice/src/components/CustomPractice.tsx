@@ -306,12 +306,36 @@ export const CustomPractice = () => {
 
       {practiceActive && (
         <div className="practice-area">
-          <div className="current-unit">
-            <h3>{units[currentUnitIndex]}</h3>
-            <p>
-              Unit {currentUnitIndex + 1} of {units.length}
-              {completedCycles > 0 && ` (Cycles completed: ${completedCycles})`}
-            </p>
+          <div className="units-display">
+            {/* Previous Unit */}
+            <div className={`unit previous-unit ${currentUnitIndex > 0 ? '' : 'empty-unit'}`}>
+              {currentUnitIndex > 0 && (
+                <>
+                  <h4>Previous</h4>
+                  <div className="unit-text">{units[currentUnitIndex - 1]}</div>
+                </>
+              )}
+            </div>
+
+            {/* Current Unit */}
+            <div className="unit current-unit">
+              <h4>Current</h4>
+              <div className="unit-text">{units[currentUnitIndex]}</div>
+              <p>
+                Unit {currentUnitIndex + 1} of {units.length}
+                {completedCycles > 0 && ` (Cycles completed: ${completedCycles})`}
+              </p>
+            </div>
+
+            {/* Next Unit */}
+            <div className={`unit next-unit ${currentUnitIndex < units.length - 1 ? '' : 'empty-unit'}`}>
+              {currentUnitIndex < units.length - 1 && (
+                <>
+                  <h4>Next</h4>
+                  <div className="unit-text">{units[currentUnitIndex + 1]}</div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="input-area">
