@@ -41,6 +41,7 @@ export const CustomPractice = () => {
   }, []);
 
   // Handle interleave count change with validation
+
   const handleInterleaveCountChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -308,7 +309,11 @@ export const CustomPractice = () => {
         <div className="practice-area">
           <div className="units-display">
             {/* Previous Unit */}
-            <div className={`unit previous-unit ${currentUnitIndex > 0 ? '' : 'empty-unit'}`}>
+            <div
+              className={`unit previous-unit ${
+                currentUnitIndex > 0 ? "" : "empty-unit"
+              }`}
+            >
               {currentUnitIndex > 0 && (
                 <>
                   <h4>Previous</h4>
@@ -321,14 +326,14 @@ export const CustomPractice = () => {
             <div className="unit current-unit">
               <h4>Current</h4>
               <div className="unit-text">{units[currentUnitIndex]}</div>
-              <p>
-                Unit {currentUnitIndex + 1} of {units.length}
-                {completedCycles > 0 && ` (Cycles completed: ${completedCycles})`}
-              </p>
             </div>
 
             {/* Next Unit */}
-            <div className={`unit next-unit ${currentUnitIndex < units.length - 1 ? '' : 'empty-unit'}`}>
+            <div
+              className={`unit next-unit ${
+                currentUnitIndex < units.length - 1 ? "" : "empty-unit"
+              }`}
+            >
               {currentUnitIndex < units.length - 1 && (
                 <>
                   <h4>Next</h4>
@@ -336,6 +341,12 @@ export const CustomPractice = () => {
                 </>
               )}
             </div>
+          </div>
+
+          {/* Unit counter below the units display */}
+          <div className="unit-counter">
+            Unit {currentUnitIndex + 1} of {units.length}
+            {completedCycles > 0 && ` (Cycles completed: ${completedCycles})`}
           </div>
 
           <div className="input-area">
