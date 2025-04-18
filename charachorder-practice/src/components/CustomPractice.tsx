@@ -17,6 +17,7 @@ export const CustomPractice = () => {
   const [isShuffled, setIsShuffled] = useState(false);
   const [isInterleaved, setIsInterleaved] = useState(false);
   const [isRepeated, setIsRepeated] = useState(false);
+  const [requireTrailingSpace, setRequireTrailingSpace] = useState(false);
   const [interleaveCount, setInterleaveCount] = useState(3); // Default: 3 repetitions
   const [interleaveInputValue, setInterleaveInputValue] = useState("3"); // Input field value
   const [practiceActive, setPracticeActive] = useState(false);
@@ -209,23 +210,39 @@ export const CustomPractice = () => {
     // Master mode: check if the input is correct so far
     if (masterMode) {
       const currentUnit = units[currentUnitIndex];
-      // Check if the input is a valid prefix of the current unit
-      if (!currentUnit.startsWith(value)) {
-        // Reset input if typed character is incorrect
-        setUserInput("");
-        return;
+
+      if (requireTrailingSpace) {
+        // In trailing space mode, allow the unit itself plus an optional trailing space
+        if (value === currentUnit || value === `${currentUnit} `) {
+          // Valid input: either the exact unit or unit plus space
+          setUserInput(value);
+
+          // If we have the unit plus space, match is complete
+          if (value === `${currentUnit} `) {
+            advanceToNextUnit(value.length);
+            return;
+          }
+        } else if (currentUnit.startsWith(value)) {
+          // Valid partial input
+          setUserInput(value);
+        } else {
+          // Invalid input, reset
+          setUserInput("");
+          return;
+        }
+      } else {
+        // Regular master mode (no trailing space required)
+        // Check if the input is a valid prefix of the current unit
+        if (!currentUnit.startsWith(value)) {
+          // Reset input if typed character is incorrect
+          setUserInput("");
+          return;
+        }
+        setUserInput(value);
       }
+    } else {
+      setUserInput(value);
     }
-
-    setUserInput(value);
-
-    // // Do an immediate check for exact matches or matches with trailing space
-    // // This helps catch chorded inputs right away
-    // const currentUnit = units[currentUnitIndex];
-    // if (value === currentUnit || value === `${currentUnit} `) {
-    //   advanceToNextUnit();
-    //   return; // Skip debouncing if we already matched
-    // }
 
     // For other cases, use debouncing to handle complex scenarios
     // Clear any existing debounce timer
@@ -249,16 +266,24 @@ export const CustomPractice = () => {
   const checkForMatch = (trimmedValue: string, originalValue: string) => {
     const currentUnit = units[currentUnitIndex];
 
-    // Match conditions:
-    // 1. Trimmed input matches exactly (handles leading/trailing spaces)
-    // 2. Original input with a trailing space (for chorded input)
-    // 3. Original input itself (direct match)
-    if (
-      trimmedValue === currentUnit ||
-      originalValue === `${currentUnit} ` ||
-      originalValue === currentUnit
-    ) {
-      advanceToNextUnit(trimmedValue.length);
+    // Match conditions vary based on trailing space requirement
+    if (requireTrailingSpace) {
+      // Only match if there's a trailing space
+      if (originalValue === `${currentUnit} `) {
+        advanceToNextUnit(trimmedValue.length);
+      }
+    } else {
+      // Match conditions without trailing space requirement:
+      // 1. Trimmed input matches exactly (handles leading/trailing spaces)
+      // 2. Original input with a trailing space (for chorded input)
+      // 3. Original input itself (direct match)
+      if (
+        trimmedValue === currentUnit ||
+        originalValue === `${currentUnit} ` ||
+        originalValue === currentUnit
+      ) {
+        advanceToNextUnit(trimmedValue.length);
+      }
     }
   };
 
@@ -519,12 +544,27 @@ export const CustomPractice = () => {
                 />
                 Master Mode
               </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={requireTrailingSpace}
+                  onChange={() =>
+                    setRequireTrailingSpace(!requireTrailingSpace)
+                  }
+                />
+                Require Trailing Space
+              </label>
               <div className="mode-description">
                 {masterMode && (
-                  <span className="master-mode-info">
+                  <p className="master-mode-info">
                     In Master Mode, any incorrect keystroke will reset your
                     input
-                  </span>
+                  </p>
+                )}
+                {requireTrailingSpace && (
+                  <p className="trailing-space-info">
+                    Must end each unit with a space to proceed
+                  </p>
                 )}
               </div>
             </div>
