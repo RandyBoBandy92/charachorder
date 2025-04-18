@@ -22,6 +22,7 @@ export const CustomPractice = () => {
   const [completedCycles, setCompletedCycles] = useState(0);
   const [showCycleNotification, setShowCycleNotification] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [masterMode, setMasterMode] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const inputDebounceTimerRef = useRef<number | null>(null);
@@ -172,6 +173,18 @@ export const CustomPractice = () => {
   // Handle user input with debouncing and trimming
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+
+    // Master mode: check if the input is correct so far
+    if (masterMode) {
+      const currentUnit = units[currentUnitIndex];
+      // Check if the input is a valid prefix of the current unit
+      if (!currentUnit.startsWith(value)) {
+        // Reset input if typed character is incorrect
+        setUserInput("");
+        return;
+      }
+    }
+
     setUserInput(value);
 
     // // Do an immediate check for exact matches or matches with trailing space
@@ -456,6 +469,22 @@ export const CustomPractice = () => {
                       }}
                     />
                   </div>
+                )}
+              </div>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={masterMode}
+                  onChange={() => setMasterMode(!masterMode)}
+                />
+                Master Mode
+              </label>
+              <div className="mode-description">
+                {masterMode && (
+                  <span className="master-mode-info">
+                    In Master Mode, any incorrect keystroke will reset your
+                    input
+                  </span>
                 )}
               </div>
             </div>
