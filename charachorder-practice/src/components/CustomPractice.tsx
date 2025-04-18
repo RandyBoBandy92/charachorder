@@ -16,6 +16,7 @@ export const CustomPractice = () => {
   const [userInput, setUserInput] = useState("");
   const [isShuffled, setIsShuffled] = useState(false);
   const [isInterleaved, setIsInterleaved] = useState(false);
+  const [isRepeated, setIsRepeated] = useState(false);
   const [interleaveCount, setInterleaveCount] = useState(3); // Default: 3 repetitions
   const [interleaveInputValue, setInterleaveInputValue] = useState("3"); // Input field value
   const [practiceActive, setPracticeActive] = useState(false);
@@ -64,6 +65,24 @@ export const CustomPractice = () => {
       const clampedValue = Math.min(10, Math.max(1, numValue));
       setInterleaveCount(clampedValue);
     }
+  };
+
+  // Toggle interleave mode
+  const toggleInterleave = () => {
+    // If turning on interleave, turn off repeat
+    if (!isInterleaved) {
+      setIsRepeated(false);
+    }
+    setIsInterleaved(!isInterleaved);
+  };
+
+  // Toggle repeat mode
+  const toggleRepeat = () => {
+    // If turning on repeat, turn off interleave
+    if (!isRepeated) {
+      setIsInterleaved(false);
+    }
+    setIsRepeated(!isRepeated);
   };
 
   // When modal opens, sync the interleaveInputValue with interleaveCount
@@ -121,8 +140,21 @@ export const CustomPractice = () => {
       }
     }
 
+    // Apply repeat if enabled
+    if (isRepeated && finalUnits.length > 0) {
+      const repeatedUnits = [];
+
+      // For each unit, repeat it interleaveCount times in sequence
+      for (const unit of finalUnits) {
+        for (let i = 0; i < interleaveCount; i++) {
+          repeatedUnits.push(unit);
+        }
+      }
+
+      finalUnits = repeatedUnits;
+    }
     // Then apply interleaving if enabled (using the potentially shuffled units)
-    if (isInterleaved && finalUnits.length > 1) {
+    else if (isInterleaved && finalUnits.length > 1) {
       // Create a pattern where each unit appears the specified number of times,
       // interleaved with other units to create contextual switching
       const interleavedUnits = [];
@@ -441,11 +473,19 @@ export const CustomPractice = () => {
                   <input
                     type="checkbox"
                     checked={isInterleaved}
-                    onChange={() => setIsInterleaved(!isInterleaved)}
+                    onChange={toggleInterleave}
                   />
                   Interleave Units
                 </label>
-                {isInterleaved && (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isRepeated}
+                    onChange={toggleRepeat}
+                  />
+                  Repeat Units
+                </label>
+                {(isInterleaved || isRepeated) && (
                   <div className="interleave-count">
                     <label htmlFor="interleave-count">Repetitions:</label>
                     <input
