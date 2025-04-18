@@ -7,12 +7,20 @@ interface HistoryEntry {
   date: string;
 }
 
+// Type for word list entry
+interface WordListEntry {
+  Word: string;
+  Frequency: number;
+  "Main Type": string;
+}
+
 export const CustomPractice = () => {
   const [inputText, setInputText] = useState("");
   const [units, setUnits] = useState<string[]>([]);
   const [currentUnitIndex, setCurrentUnitIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showWordListModal, setShowWordListModal] = useState(false);
   const [userInput, setUserInput] = useState("");
   const [isShuffled, setIsShuffled] = useState(false);
   const [isInterleaved, setIsInterleaved] = useState(false);
@@ -25,6 +33,11 @@ export const CustomPractice = () => {
   const [showCycleNotification, setShowCycleNotification] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [masterMode, setMasterMode] = useState(false);
+  const [wordList, setWordList] = useState<WordListEntry[]>([]);
+  const [wordListLoading, setWordListLoading] = useState(false);
+  const [wordListError, setWordListError] = useState<string | null>(null);
+  const [selectedWordCount, setSelectedWordCount] = useState(100);
+  const [wordCountInputValue, setWordCountInputValue] = useState("100");
 
   const inputRef = useRef<HTMLInputElement>(null);
   const inputDebounceTimerRef = useRef<number | null>(null);
@@ -43,8 +56,40 @@ export const CustomPractice = () => {
     }
   }, []);
 
-  // Handle interleave count change with validation
+  // Load word list from JSON file on component mount
+  useEffect(() => {
+    const fetchWordList = async () => {
+      setWordListLoading(true);
+      setWordListError(null);
 
+      try {
+        const response = await fetch(
+          "/charachorder/word_lists/most-common-words-1k.json"
+        );
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch word list: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        setWordList(data);
+      } catch (error) {
+        console.error("Error loading word list:", error);
+        setWordListError(
+          error instanceof Error
+            ? error.message
+            : "Unknown error loading word list"
+        );
+      } finally {
+        setWordListLoading(false);
+      }
+    };
+
+    fetchWordList();
+  }, []);
+
+  // Handle interleave count change with validation
   const handleInterleaveCountChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -363,6 +408,62 @@ export const CustomPractice = () => {
     }
   }, [practiceActive, currentUnitIndex]);
 
+  // Handle word count input change with validation
+  const handleWordCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+
+    // Always update the input field value
+    setWordCountInputValue(inputValue);
+
+    // Handle empty input
+    if (inputValue === "") {
+      return;
+    }
+
+    const numValue = parseInt(inputValue);
+
+    // Update only when we have a valid number
+    if (!isNaN(numValue)) {
+      // Clamp between 1 and max available words
+      const maxWords = wordList.length;
+      const clampedValue = Math.min(maxWords, Math.max(1, numValue));
+      setSelectedWordCount(clampedValue);
+
+      // Update the input value if it was clamped
+      if (clampedValue !== numValue) {
+        setWordCountInputValue(clampedValue.toString());
+      }
+    }
+  };
+
+  // Load selected number of words from the word list
+  const loadWordsFromList = () => {
+    if (wordList.length === 0) {
+      setWordListError("Word list is empty");
+      return;
+    }
+
+    // Get the requested number of words (clamped to the list size)
+    const wordsToLoad = Math.min(selectedWordCount, wordList.length);
+
+    // Extract words and join with spaces
+    const selectedWords = wordList
+      .slice(0, wordsToLoad)
+      .map((entry) => entry.Word)
+      .join(" ");
+
+    // Set the text and open the custom text modal
+    setInputText(selectedWords);
+    setShowWordListModal(false);
+    setShowModal(true);
+  };
+
+  // Open word list selection modal
+  const openWordListModal = () => {
+    setWordCountInputValue(selectedWordCount.toString());
+    setShowWordListModal(true);
+  };
+
   return (
     <div className="custom-practice">
       <h2>Custom Practice</h2>
@@ -371,6 +472,14 @@ export const CustomPractice = () => {
         <div className="practice-controls">
           <button onClick={openInputModal} className="primary-button">
             Add Custom Text
+          </button>
+          <button
+            onClick={openWordListModal}
+            className="primary-button"
+            disabled={wordListLoading || wordList.length === 0}
+          >
+            Load Word List
+            {wordListLoading && " (Loading...)"}
           </button>
         </div>
       )}
@@ -618,6 +727,58 @@ export const CustomPractice = () => {
                 className="secondary-button"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Word List Selection Modal */}
+      {showWordListModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Load Common Words</h3>
+            <p>Select how many common words to load for practice:</p>
+
+            {wordListError && (
+              <div className="error-message">Error: {wordListError}</div>
+            )}
+
+            <div className="word-count-selection">
+              <label htmlFor="word-count">Number of words:</label>
+              <input
+                id="word-count"
+                type="number"
+                min="1"
+                max={wordList.length}
+                value={wordCountInputValue}
+                onChange={handleWordCountChange}
+                onBlur={() => {
+                  // Ensure valid value on blur
+                  if (
+                    wordCountInputValue === "" ||
+                    isNaN(parseInt(wordCountInputValue))
+                  ) {
+                    setWordCountInputValue(selectedWordCount.toString());
+                  }
+                }}
+              />
+              <span className="max-words-info">(Max: {wordList.length})</span>
+            </div>
+
+            <div className="modal-buttons">
+              <button
+                onClick={() => setShowWordListModal(false)}
+                className="secondary-button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={loadWordsFromList}
+                className="primary-button"
+                disabled={wordList.length === 0}
+              >
+                Load Words
               </button>
             </div>
           </div>
